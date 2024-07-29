@@ -94,7 +94,7 @@ export async function handleInvite(req: SrfRequest, res: SrfResponse) {
       localSdpA,
     })
     console.log(
-      `Incoming call ${call_id} created UAC and UAS witn dest ${dest}`,
+      `Incoming call ${call_id} created UAC and UAS with dest ${dest}`,
     )
 
     uac.on('destroy', async () => {
