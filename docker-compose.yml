@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  drachtio-server:
+    image: drachtio/drachtio-server:0.9.0
+    command: drachtio --port 9022 --contact "sip:127.0.0.1:25060;transport=tcp,udp"
+    environment:
+      DRACHTIO_SECRET: '123456'
+    network_mode: host
