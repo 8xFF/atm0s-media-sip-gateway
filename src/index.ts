@@ -1,6 +1,8 @@
 import {
+  ALLOWED_NUMBERS_SYNC,
   ATM0S_CONFIG,
   DRACHTIO_CONFIG,
+  ENABLE_REGISTER,
   INCOMING_CALL_HOOK,
   SECRET,
 } from 'config'
@@ -16,7 +18,13 @@ const fastify = Fastify({
 })
 
 async function boot() {
-  const sip = new SipGateway(DRACHTIO_CONFIG, INCOMING_CALL_HOOK, ATM0S_CONFIG)
+  const sip = new SipGateway(
+    DRACHTIO_CONFIG,
+    INCOMING_CALL_HOOK,
+    ATM0S_CONFIG,
+    ENABLE_REGISTER,
+    ALLOWED_NUMBERS_SYNC,
+  )
   await sip.connect()
 
   await fastify.register(fastifySwagger)

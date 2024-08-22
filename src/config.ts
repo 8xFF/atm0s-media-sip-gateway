@@ -19,7 +19,7 @@ export const DRACHTIO_CONFIG = {
 export const INCOMING_CALL_HOOK =
   process.env.INCOMING_CALL_HOOK || 'http://localhost:3000'
 
-export const ALLOWED_SIPS_SYNC = process.env.ALLOWED_SIPS_SYNC
+export const ALLOWED_NUMBERS_SYNC = process.env.ALLOWED_NUMBERS_SYNC
 
 export const ENABLE_REGISTER = process.env.ENABLE_REGISTER === 'true'
 
