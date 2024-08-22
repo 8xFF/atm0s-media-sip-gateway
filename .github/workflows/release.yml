@@ -19,7 +19,6 @@ env:
 
 jobs:
   deploy-docker:
-    needs: build-release
     runs-on: ubuntu-latest
     steps:
       - name: Set up QEMU
