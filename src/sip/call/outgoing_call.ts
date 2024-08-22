@@ -1,5 +1,5 @@
-import Srf, { Dialog, SrfRequest } from 'drachtio-srf'
-import { Call, CallAction } from './lib'
+import Srf, { Dialog, SrfRequest, SrfResponse } from 'drachtio-srf'
+import { Call, CallAction, CallActionResponse } from './lib'
 import { Atm0sConfig, createAtm0sToken } from 'sip/atm0s'
 import { rtpCreateOffer, rtpDelete, rtpSetAnswer } from 'sip/reqs'
 import { EventEmitter } from 'stream'
@@ -9,6 +9,7 @@ import { DRACHTIO_CONFIG } from 'config'
 export class OutgoingCall extends EventEmitter implements Call {
   callId = 'out-' + new Date().getTime()
   req?: SrfRequest
+  res?: SrfResponse
   uac?: Dialog
   rtpEndpoint?: string
 
@@ -31,7 +32,7 @@ export class OutgoingCall extends EventEmitter implements Call {
     const { endpoint, sdp } = await rtpCreateOffer(this.atm0s.gateway, token)
     this.rtpEndpoint = this.atm0s.gateway + endpoint
     console.log('[OutgoingCall] create atm0s sdp', this.rtpEndpoint, sdp)
-    this.uac = await this.srf.createUAC(
+    this.srf.createUAC(
       `sip:${this.to}@${this.dest}`,
       {
         localSdp: sdp,
@@ -40,54 +41,64 @@ export class OutgoingCall extends EventEmitter implements Call {
         },
       },
       {
-        cbRequest: (req) => {
+        cbRequest: (err: any, req: SrfRequest) => {
+          console.log('[OutgoingCall] req created', err)
           this.req = req
         },
-      },
-      async (err, uac) => {
+        cbProvisional: (res: SrfResponse) => {
+          console.log('[OutgoingCall] res provisional', res.status, res.body)
+          if (res.body) {
+            // TODO how to handle early media
+          }
+        },
+      } as any,
+      (err, uac) => {
+        this.uac = uac
         if (err) {
           console.log('[OutgoingCall] Outgoing error', err.status)
-          await this.onRejected()
+
+          this.onRejected()
         } else {
-          console.log('[OutgoingCall] Outgoing answer', uac.remote.sdp)
-          uac.on('destroy', this.onEnded)
-          await this.onAccepted(uac.remote.sdp)
+          console.log(
+            '[OutgoingCall] Outgoing answer',
+            (uac as any).res?.status,
+            uac.remote.sdp,
+          )
+
+          uac.on('destroy', () => {
+            this.onEnded()
+          })
+          this.onAccepted(uac.remote.sdp)
         }
       },
     )
     console.log('[OutgoingCall] Created uac')
   }
 
-  /** Internal handle */
+  /** Internal handle, this function don't act with sip, only stream or fire event */
   onAccepted = async (sdp: string) => {
     console.log('[OutgoingCall] OnAccept')
     this.emit('accepted')
     await rtpSetAnswer(this.rtpEndpoint!, sdp)
-    await feedbackStatus(this.hook, { state: 'Accepted' })
+    feedbackStatus(this.hook, { state: 'Accepted' })
   }
 
   onCanceled = async () => {
     console.log('[OutgoingCall] OnCanceled')
     this.emit('canceled')
     if (this.rtpEndpoint) {
-      rtpDelete(this.rtpEndpoint)
+      await rtpDelete(this.rtpEndpoint)
     }
-    if (this.req) {
-      const callback = () => {
-        return {}
-      }
-      this.req.cancel(callback)
-    }
-    await feedbackStatus(this.hook, { state: 'Canceled' })
+    feedbackStatus(this.hook, { state: 'Canceled' })
   }
 
   onRejected = async () => {
     console.log('[OutgoingCall] OnRejected')
     this.emit('rejected')
     if (this.rtpEndpoint) {
-      rtpDelete(this.rtpEndpoint)
+      await rtpDelete(this.rtpEndpoint)
     }
-    await feedbackStatus(this.hook, { state: 'Rejected' })
+    feedbackStatus(this.hook, { state: 'Rejected' })
   }
 
   onEnded = async () => {
@@ -95,29 +106,48 @@ export class OutgoingCall extends EventEmitter implements Call {
     this.emit('ended')
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
-      delete this.rtpEndpoint
     }
-    await feedbackStatus(this.hook, { state: 'Ended' })
+    feedbackStatus(this.hook, { state: 'Ended' })
   }
 
   /** Call interface: doAction method */
-  async doAction(action: CallAction): Promise<void> {
+  async doAction(action: CallAction): Promise<CallActionResponse> {
     switch (action) {
       case 'Cancel': {
-        await this.onCanceled()
-        break
+        if (!this.uac && this.req) {
+          this.req.cancel(() => {
+            return {}
+          })
+          await this.onCanceled()
+          return { status: true, message: 'Canceled' }
+        } else {
+          console.warn(
+            '[OutgoingCall] cancel but this.req is not defined or already accepted',
+          )
+          return {
+            status: false,
+            message: 'Cancel but this.req is not defined or already accepted',
+          }
+        }
       }
       case 'End': {
         if (this.uac) {
           this.uac.destroy()
-          delete this.uac
+          return { status: true, message: 'Ended' }
         } else {
           console.log(
-            '[OutgoingCall] Call received End but not in runing state',
+            '[OutgoingCall] Call received End but not in accepted state',
           )
+          return {
+            status: false,
+            message: 'End but not in accepted state',
+          }
         }
-        break
       }
+    }
+    return {
+      status: false,
+      message: 'Unsupported action',
     }
   }
 }

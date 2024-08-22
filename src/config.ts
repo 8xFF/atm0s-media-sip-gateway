@@ -24,6 +24,7 @@ export const ALLOWED_NUMBERS_SYNC = process.env.ALLOWED_NUMBERS_SYNC
 export const ENABLE_REGISTER = process.env.ENABLE_REGISTER === 'true'
 
 export const SECRET = process.env.SECRET || 'insecure'
+export const PORT = parseInt(process.env.PORT || '5000')
 
 export const ATM0S_CONFIG = {
   gateway: process.env.ATM0S_GATEWAY || 'http://127.0.0.1:3000',

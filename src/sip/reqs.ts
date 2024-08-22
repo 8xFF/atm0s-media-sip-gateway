@@ -62,13 +62,19 @@ export async function rtpSetAnswer(endpoind: string, sdp: string) {
 }
 
 export async function rtpDelete(endpoind: string) {
-  const res = await fetch(endpoind, {
-    method: 'DELETE',
-  })
+  try {
+    const res = await fetch(endpoind, {
+      method: 'DELETE',
+    })
 
-  if (res.status == 200) {
-  } else {
-    const content = await res.text()
-    throw new Error(content)
+    if (res.status == 200) {
+      console.log('[RtpDelete] OK', endpoind)
+    } else {
+      const content = await res.text()
+      console.log('[RtpDelete] Error', res.status, content)
+      throw new Error(content)
+    }
+  } catch (e) {
+    console.log('[RtpDelete] Error', e)
   }
 }

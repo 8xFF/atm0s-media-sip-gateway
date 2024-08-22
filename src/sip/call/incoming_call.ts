@@ -1,5 +1,5 @@
 import Srf, { SrfRequest, SrfResponse, Dialog } from 'drachtio-srf'
-import { Call, CallAction } from './lib'
+import { Call, CallAction, CallActionResponse } from './lib'
 import { feedbackStatus, IncallHookResponse } from 'sip/hooks'
 import { Atm0sConfig, createAtm0sToken } from 'sip/atm0s'
 import { rtpDelete, rtpCreateAnswer } from 'sip/reqs'
@@ -20,31 +20,32 @@ export class IncomingCall extends EventEmitter implements Call {
   ) {
     super()
     const req2 = req as any
-    req2.on('cancel', this.onCancel)
+    req2.on('cancel', () => {
+      this.onCanceled()
+    })
   }
 
   /** Internal handle */
-  onCancel = async () => {
+  onCanceled = async () => {
     console.log('[IncomingCall] OnCanceled')
     this.emit('canceled')
-    await feedbackStatus(this.call.hook, { state: 'Canceled' })
+    feedbackStatus(this.call.hook, { state: 'Canceled' })
   }
 
   onRejected = async () => {
     console.log('[IncomingCall] OnRejected')
     this.emit('rejected')
-    this.res.send(486) //Busy
-    await feedbackStatus(this.call.hook, { state: 'Rejected' })
+    feedbackStatus(this.call.hook, { state: 'Rejected' })
   }
 
-  onEnd = async () => {
+  onEnded = async () => {
     console.log('[IncomingCall] OnEnded')
     this.emit('ended')
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
       delete this.rtpEndpoint
     }
-    await feedbackStatus(this.call.hook, { state: 'Ended' })
+    feedbackStatus(this.call.hook, { state: 'Ended' })
   }
 
   async onAccepted(): Promise<void> {
@@ -64,37 +65,40 @@ export class IncomingCall extends EventEmitter implements Call {
     this.uas = await this.srf.createUAS(this.req, this.res, {
       localSdp: sdp,
     })
-    this.uas.on('destroy', this.onEnd)
-    await feedbackStatus(this.call.hook, { state: 'Accepted' })
+    this.uas.on('destroy', () => {
+      this.onEnded()
+    })
+    feedbackStatus(this.call.hook, { state: 'Accepted' })
   }
 
   /** Call interface: doAction method */
-  async doAction(action: CallAction): Promise<void> {
+  async doAction(action: CallAction): Promise<CallActionResponse> {
     switch (action) {
       case 'Accept': {
         await this.onAccepted()
-        break
-      }
-      case 'Cancel': {
-        await this.onCancel()
-        break
+        return { status: true, message: 'Accepted' }
       }
       case 'Reject': {
+        await this.res.send(486) //Busy
         await this.onRejected()
-        break
+        return { status: true, message: 'Rejected' }
       }
       case 'End': {
         if (this.uas) {
           this.uas.destroy()
-          delete this.uas
+          return { status: true, message: 'Ended' }
         } else {
           console.log(
-            'Call received End but not in runing state',
+            'Call received End but not in accepted state',
             this.req.callId,
           )
         }
-        break
+        return { status: false, message: 'End but not in accepted state' }
       }
+    }
+    return {
+      status: false,
+      message: 'Unsupported action',
     }
   }
 }

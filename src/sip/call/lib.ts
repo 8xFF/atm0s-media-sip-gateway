@@ -9,6 +9,12 @@ export interface CallCfg {
   to_number: string
 }
 
+export interface CallActionResponse {
+  status: boolean
+  error?: string
+  message: string
+}
+
 export interface Call {
-  doAction(action: CallAction): Promise<void>
+  doAction(action: CallAction): Promise<CallActionResponse>
 }

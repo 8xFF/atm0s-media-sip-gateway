@@ -59,6 +59,9 @@ export class SipGateway {
       this.incoming_calls.get(call_id) || this.outgoing_calls.get(call_id)
     if (call) {
       await call.doAction(action)
+      return true
+    } else {
+      return false
     }
   }
 
@@ -82,6 +85,15 @@ export class SipGateway {
       peer,
     )
     await outgoing_call.makeCall()
+    outgoing_call.on('canceled', () => {
+      this.incoming_calls.delete(call_id)
+    })
+    outgoing_call.on('rejected', () => {
+      this.incoming_calls.delete(call_id)
+    })
+    outgoing_call.on('ended', () => {
+      this.incoming_calls.delete(call_id)
+    })
     this.outgoing_calls.set(call_id, outgoing_call)
 
     return call_id

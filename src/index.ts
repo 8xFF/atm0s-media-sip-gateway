@@ -4,6 +4,7 @@ import {
   DRACHTIO_CONFIG,
   ENABLE_REGISTER,
   INCOMING_CALL_HOOK,
+  PORT,
   SECRET,
 } from 'config'
 import { SipGateway } from 'sip/lib'
@@ -52,7 +53,8 @@ async function boot() {
   })
 
   fastify.post('/call', { schema: MAKE_CALL_SCHEMA }, async (req) => {
-    if (req.headers['X-API-Key'] != SECRET) {
+    if (req.headers['x-api-key'] != SECRET) {
+      console.log(req.headers, SECRET)
       return { status: false, error: 'AUTHENTICATION_ERROR' }
     }
 
@@ -78,9 +80,9 @@ async function boot() {
     const { call_id } = req.params as any
     const body = req.body as UpdateCallRequest
     try {
-      await sip.callAction(call_id, body.state)
+      const res = await sip.callAction(call_id, body.state)
       console.log('Update Call success', call_id)
-      return { status: true }
+      return res
     } catch (e: any) {
       console.log('Update Call error', e)
       return {
@@ -93,7 +95,7 @@ async function boot() {
 
   // Run the server!
   try {
-    await fastify.listen({ host: '0.0.0.0', port: 5000 })
+    await fastify.listen({ host: '0.0.0.0', port: PORT })
   } catch (err) {
     fastify.log.error(err)
     process.exit(1)
