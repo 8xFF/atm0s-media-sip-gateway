@@ -1,5 +1,3 @@
-import { ATM0S_CONFIG } from 'config'
-
 interface CreateTokenRes {
   status: boolean
   error: string
@@ -8,11 +6,20 @@ interface CreateTokenRes {
   }
 }
 
-export async function createAtm0sToken(room: string, peer: string) {
-  const res = await fetch(ATM0S_CONFIG.GATEWAY + '/token/rtpengine', {
+export interface Atm0sConfig {
+  gateway: string
+  secret: string
+}
+
+export async function createAtm0sToken(
+  config: Atm0sConfig,
+  room: string,
+  peer: string,
+) {
+  const res = await fetch(config.gateway + '/token/rtpengine', {
     method: 'POST',
     headers: {
-      Authorization: 'Bearer ' + ATM0S_CONFIG.SECRET,
+      Authorization: 'Bearer ' + config.secret,
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
