@@ -15,8 +15,8 @@ dependencies:
     specifier: ^16.4.5
     version: 16.4.5
   drachtio-srf:
-    specifier: 4.5.40
-    version: 4.5.40
+    specifier: 4.5.39
+    version: 4.5.39
   fastify:
     specifier: ^4.28.1
     version: 4.28.1
@@ -731,8 +731,8 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
-  /drachtio-srf@4.5.40:
-    resolution: {integrity: sha512-rybIu6kcY8oyw98z9eYQ5lSOALdEINPVc82N3Updl78qgLJvo9qEQ/j+idawUfMlIuqJ0Ab38wkqNeg5Cn3jNA==}
+  /drachtio-srf@4.5.39:
+    resolution: {integrity: sha512-iYjLqJVcSFLEflHBbYTXtSsyKtGLHHiteORUTinrsUhJboTbRXaUPUOoFYFaxGY5Cn+Grueg7D1D9frT6Od1YA==}
     engines: {node: '>= 10.x'}
     dependencies:
       debug: 3.2.7

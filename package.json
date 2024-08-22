@@ -41,7 +41,7 @@
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^4.1.0",
     "dotenv": "^16.4.5",
-    "drachtio-srf": "4.5.40",
+    "drachtio-srf": "4.5.39",
     "fastify": "^4.28.1",
     "rtpengine-client": "^0.4.12"
   }
