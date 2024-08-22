@@ -36,7 +36,7 @@ export class SipGateway {
       srf2.register(this.onRegister)
     }
 
-    if (this.allowed_numbers) {
+    if (this.allowed_numbers_sync) {
       this.syncAllowed()
       setInterval(this.syncAllowed, 60000)
     }
