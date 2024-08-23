@@ -58,10 +58,13 @@ export class SipGateway {
     const call =
       this.incoming_calls.get(call_id) || this.outgoing_calls.get(call_id)
     if (call) {
-      await call.doAction(action)
-      return true
+      return await call.doAction(action)
     } else {
-      return false
+      return {
+        status: false,
+        error: 'CALL_NOT_FOUND',
+        message: 'Provided call_id not found',
+      }
     }
   }
 

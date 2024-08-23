@@ -75,13 +75,29 @@ export class IncomingCall extends EventEmitter implements Call {
   async doAction(action: CallAction): Promise<CallActionResponse> {
     switch (action) {
       case 'Accept': {
-        await this.onAccepted()
-        return { status: true, message: 'Accepted' }
+        if (!this.uas) {
+          await this.onAccepted()
+          return { status: true, message: 'Accepted' }
+        } else {
+          return {
+            status: false,
+            error: 'WRONG_STATE',
+            message: 'Accept but already accepted state',
+          }
+        }
       }
       case 'Reject': {
-        await this.res.send(486) //Busy
-        await this.onRejected()
-        return { status: true, message: 'Rejected' }
+        if (!this.uas) {
+          await this.res.send(486) //Busy
+          await this.onRejected()
+          return { status: true, message: 'Rejected' }
+        } else {
+          return {
+            status: false,
+            error: 'WRONG_STATE',
+            message: 'Reject but already accepted state',
+          }
+        }
       }
       case 'End': {
         if (this.uas) {
@@ -93,11 +109,16 @@ export class IncomingCall extends EventEmitter implements Call {
             this.req.callId,
           )
         }
-        return { status: false, message: 'End but not in accepted state' }
+        return {
+          status: false,
+          error: 'WRONG_STATE',
+          message: 'End but not in accepted state',
+        }
       }
     }
     return {
       status: false,
+      error: 'UNSUPPORTED_ACTION',
       message: 'Unsupported action',
     }
   }

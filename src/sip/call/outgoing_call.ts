@@ -126,6 +126,7 @@ export class OutgoingCall extends EventEmitter implements Call {
           )
           return {
             status: false,
+            error: 'WRONG_STATE',
             message: 'Cancel but this.req is not defined or already accepted',
           }
         }
@@ -133,6 +134,7 @@ export class OutgoingCall extends EventEmitter implements Call {
       case 'End': {
         if (this.uac) {
           this.uac.destroy()
+          await this.onEnded()
           return { status: true, message: 'Ended' }
         } else {
           console.log(
@@ -140,6 +142,7 @@ export class OutgoingCall extends EventEmitter implements Call {
           )
           return {
             status: false,
+            error: 'WRONG_STATE',
             message: 'End but not in accepted state',
           }
         }
@@ -147,6 +150,7 @@ export class OutgoingCall extends EventEmitter implements Call {
     }
     return {
       status: false,
+      error: 'UNSUPPORTED_ACTION',
       message: 'Unsupported action',
     }
   }
