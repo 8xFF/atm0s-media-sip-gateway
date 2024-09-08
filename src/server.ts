@@ -1,35 +1,51 @@
 import {
   ALLOWED_NUMBERS_SYNC,
-  ATM0S_CONFIG,
   DRACHTIO_CONFIG,
   ENABLE_REGISTER,
   INCOMING_CALL_HOOK,
   PORT,
   SECRET,
 } from 'config'
-import { SipGateway } from 'sip/lib'
+import { SipCallEvent, SipGateway } from 'sip/lib'
 import Fastify from 'fastify'
 import { fastifySwaggerUi } from '@fastify/swagger-ui'
 import { fastifySwagger } from '@fastify/swagger'
-import { MAKE_CALL_SCHEMA, MakeCallRequest } from 'schemes/make_call'
-import { UPDATE_CALL_SCHEMA, UpdateCallRequest } from 'schemes/update_call'
+import { fastifyWebsocket } from '@fastify/websocket'
+import { MAKE_CALL_SCHEMA, MakeCallRequest } from './schemes/make_call'
+import { UPDATE_CALL_SCHEMA, UpdateCallRequest } from './schemes/update_call'
+import { CallEvent, WsGateway } from 'ws_gateway'
+import { errToString } from 'utils'
 
 const fastify = Fastify({
   logger: true,
 })
 
 async function boot() {
-  const sip = new SipGateway(
+  const wsGw = new WsGateway()
+  const sipGw = new SipGateway(
     DRACHTIO_CONFIG,
     INCOMING_CALL_HOOK,
-    ATM0S_CONFIG,
     ENABLE_REGISTER,
     ALLOWED_NUMBERS_SYNC,
   )
-  await sip.connect()
+  await sipGw.connect()
 
+  wsGw.on(CallEvent.Started, ({ call_id }: { call_id: string }) => {
+    console.log('Call', call_id, 'has websocket connected')
+  })
+
+  wsGw.on(CallEvent.Stopped, ({ call_id }: { call_id: string }) => {
+    console.log('Call', call_id, 'closed all websocket connections')
+    sipGw.callAction(call_id, 'ForceEnd')
+  })
+
+  sipGw.on(SipCallEvent.StateChanged, ([call_id, state]) => {
+    console.log('Call', call_id, 'updated to new state', state)
+    wsGw.fire(call_id, { state })
+  })
+
+  await fastify.register(fastifyWebsocket)
   await fastify.register(fastifySwagger)
-
   await fastify.register(fastifySwaggerUi, {
     routePrefix: '/docs',
     uiConfig: {
@@ -60,19 +76,26 @@ async function boot() {
 
     try {
       const body = req.body as MakeCallRequest
-      const call_id = await sip.makeCall(
+      const call_id = await sipGw.makeCall(
         body.sip_server,
         body.from_number,
         body.to_number,
         body.hook,
-        body.streaming.room_id,
-        body.streaming.peer_id,
+        body.streaming,
       )
       console.log('Male Call success', call_id)
-      return { status: true, data: { call_id } }
+      const token = 'fake-token'
+      return {
+        status: true,
+        data: { call_id, ws: '/ws/call/' + call_id + '?token=' + token },
+      }
     } catch (e: any) {
       console.log('Make Call error', e)
-      return { status: false, error: 'MAKE_CALL_ERROR', message: e.to_string() }
+      return {
+        status: false,
+        error: 'MAKE_CALL_ERROR',
+        message: errToString(e),
+      }
     }
   })
 
@@ -80,7 +103,7 @@ async function boot() {
     const { call_id } = req.params as any
     const body = req.body as UpdateCallRequest
     try {
-      const res = await sip.callAction(call_id, body.state)
+      const res = await sipGw.callAction(call_id, body.action)
       console.log('Update Call success', call_id)
       return res
     } catch (e: any) {
@@ -88,13 +111,21 @@ async function boot() {
       return {
         status: false,
         error: 'UPDATE_CALL_ERROR',
-        message: e.to_string(),
+        message: errToString(e),
       }
     }
   })
 
+  fastify.get('/ws/call/:call_id', { websocket: true }, (socket, req) => {
+    const { call_id } = req.params as any
+    const { token } = req.query as { token: string }
+    // TODO validate token
+    wsGw.onConnected(call_id, req.id, socket)
+  })
+
   // Run the server!
   try {
+    console.log('starting fastify with port', PORT)
     await fastify.listen({ host: '0.0.0.0', port: PORT })
   } catch (err) {
     fastify.log.error(err)

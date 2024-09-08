@@ -2,7 +2,7 @@ import { FastifySchema } from 'fastify'
 import { CallAction } from 'sip/call/lib'
 
 export interface UpdateCallRequest {
-  state: CallAction
+  action: CallAction
 }
 
 export const UPDATE_CALL_SCHEMA: FastifySchema = {
@@ -22,7 +22,7 @@ export const UPDATE_CALL_SCHEMA: FastifySchema = {
   body: {
     type: 'object',
     properties: {
-      state: {
+      action: {
         type: 'string',
         enum: ['Cancel', 'Reject', 'Accept', 'End'],
       },

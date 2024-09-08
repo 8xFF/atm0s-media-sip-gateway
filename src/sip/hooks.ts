@@ -1,4 +1,9 @@
+import { StreamingInfo } from 'schemes/make_call'
+
 export type CallState =
+  | 'Preparing'
+  | 'Dialing'
+  | 'Error'
   | 'Ringing'
   | 'Accepted'
   | 'Rejected'
@@ -10,16 +15,17 @@ export interface IncallHookRequest {
   sip_server: string
   from_number: string
   to_number: string
+  ws: string
 }
 
 export interface IncallHookResponse {
   state: 'Ringing' | 'Canceled' | 'Accepted'
   hook: string
-  room_id: string
-  peer_id: string
+  streaming: StreamingInfo
 }
 
 export interface CallUpdateStatus {
+  direction: 'in' | 'out'
   state: CallState
 }
 
@@ -48,20 +54,27 @@ export async function fetchPostJson<I, O>(url: string, body: I): Promise<O> {
 export async function feedbackStatus(
   url: string,
   body: CallUpdateStatus,
-): Promise<string> {
-  const res = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    method: 'POST',
-    body: JSON.stringify(body),
-  })
+): Promise<[string | null, any | null]> {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
 
-  if (res.status == 200) {
-    return res.text()
-  } else {
-    throw new Error('HookError')
+    if (res.status == 200) {
+      const text = await res.text()
+      return [text, null]
+    } else {
+      console.error('Feedback status error', url, res.statusText)
+      return [null, res.statusText]
+    }
+  } catch (e) {
+    console.error('Feedback status error', url, e)
+    return [null, e]
   }
 }
 
@@ -79,6 +92,7 @@ export async function hookIncoming(
       call_id,
       from_number,
       to_number,
+      ws: '/ws/call/' + call_id,
     },
   )
   return response

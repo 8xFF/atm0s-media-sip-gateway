@@ -1,11 +1,24 @@
 import Srf, { SrfConfig, SrfRequest, SrfResponse } from 'drachtio-srf'
 import { feedbackStatus, hookIncoming, syncAllowedNumbers } from './hooks'
-import { IncomingCall } from './call/incoming_call'
-import { OutgoingCall } from './call/outgoing_call'
+import {
+  IncomingCall,
+  IncomingCallEvent,
+  IncomingCallState,
+} from './call/incoming_call'
+import {
+  OutgoingCall,
+  OutgoingCallEvent,
+  OutgoingCallState,
+} from './call/outgoing_call'
 import { CallAction } from './call/lib'
-import { Atm0sConfig } from './atm0s'
+import EventEmitter from 'events'
+import { StreamingInfo } from 'schemes/make_call'
 
-export class SipGateway {
+export enum SipCallEvent {
+  StateChanged = 'StateChanged',
+}
+
+export class SipGateway extends EventEmitter {
   srf = new Srf()
   incoming_calls: Map<string, IncomingCall> = new Map()
   outgoing_calls: Map<string, OutgoingCall> = new Map()
@@ -14,10 +27,10 @@ export class SipGateway {
   constructor(
     private config: SrfConfig,
     private incoming_hook: string,
-    private atm0s: Atm0sConfig,
     private enable_register: boolean,
     private allowed_numbers_sync: string | undefined,
   ) {
+    super()
     this.srf
       .on('connect', (err, hostPort) => {
         if (!err) {
@@ -30,10 +43,22 @@ export class SipGateway {
         console.log(`Srf error: ${err}`)
       })
 
-    this.srf.invite(this.onInvite)
+    this.srf.invite(async (req, res) => {
+      try {
+        return await this.onInvite(req, res)
+      } catch (err) {
+        console.error('handle invite error', err)
+      }
+    })
     if (enable_register) {
       const srf2 = this.srf as any
-      srf2.register(this.onRegister)
+      srf2.register(async (req: SrfRequest, res: SrfResponse) => {
+        try {
+          return await this.onRegister(req, res)
+        } catch (err) {
+          console.error('handle register error', err)
+        }
+      })
     }
 
     if (this.allowed_numbers_sync) {
@@ -73,30 +98,32 @@ export class SipGateway {
     from_number: string,
     to_number: string,
     status_hook: string,
-    room: string,
-    peer: string,
+    streaming: StreamingInfo,
   ) {
     const call_id = 'out-' + new Date().getTime()
     const outgoing_call = new OutgoingCall(
       this.srf,
-      this.atm0s,
       from_number,
       to_number,
       sip_server,
       status_hook,
-      room,
-      peer,
+      streaming,
     )
     await outgoing_call.makeCall()
-    outgoing_call.on('canceled', () => {
-      this.incoming_calls.delete(call_id)
-    })
-    outgoing_call.on('rejected', () => {
-      this.incoming_calls.delete(call_id)
-    })
-    outgoing_call.on('ended', () => {
-      this.incoming_calls.delete(call_id)
-    })
+    outgoing_call.on(
+      OutgoingCallEvent.StateChanged,
+      (state: OutgoingCallState) => {
+        this.emit(SipCallEvent.StateChanged, [call_id, state])
+        switch (state) {
+          case OutgoingCallState.Canceled:
+          case OutgoingCallState.Rejected:
+          case OutgoingCallState.Error:
+          case OutgoingCallState.Ended:
+            this.outgoing_calls.delete(call_id)
+            break
+        }
+      },
+    )
     this.outgoing_calls.set(call_id, outgoing_call)
 
     return call_id
@@ -148,29 +175,26 @@ export class SipGateway {
 
       if (canceled) {
         console.log('Call canceled from caller', call_id)
-        feedbackStatus(response.hook, { state: 'Canceled' })
+        feedbackStatus(response.hook, { state: 'Canceled', direction: 'in' })
         return
       }
 
       switch (response.state) {
         case 'Accepted': {
-          const call = new IncomingCall(
-            this.srf,
-            this.atm0s,
-            req,
-            res,
-            response,
-          )
+          const call = new IncomingCall(this.srf, req, res, response)
           await call.onAccepted()
-          call.on('canceled', () => {
-            this.incoming_calls.delete(call_id)
-          })
-          call.on('rejected', () => {
-            this.incoming_calls.delete(call_id)
-          })
-          call.on('ended', () => {
-            this.incoming_calls.delete(call_id)
-          })
+          call.on(
+            IncomingCallEvent.StateChanged,
+            ({ state }: { state: IncomingCallState }) => {
+              this.emit(SipCallEvent.StateChanged, [call_id, state])
+              switch (state) {
+                case IncomingCallState.Canceled:
+                case IncomingCallState.Ended:
+                  this.incoming_calls.delete(call_id)
+                  break
+              }
+            },
+          )
           this.incoming_calls.set(call_id, call)
           break
         }
@@ -180,22 +204,20 @@ export class SipGateway {
         }
         case 'Ringing': {
           res.send(180) //ringing
-          const call = new IncomingCall(
-            this.srf,
-            this.atm0s,
-            req,
-            res,
-            response,
+          const call = new IncomingCall(this.srf, req, res, response)
+          call.on(
+            IncomingCallEvent.StateChanged,
+            ({ state }: { state: IncomingCallState }) => {
+              this.emit(SipCallEvent.StateChanged, [call_id, state])
+              switch (state) {
+                case IncomingCallState.Canceled:
+                case IncomingCallState.Rejected:
+                case IncomingCallState.Ended:
+                  this.incoming_calls.delete(call_id)
+                  break
+              }
+            },
           )
-          call.on('canceled', () => {
-            this.incoming_calls.delete(call_id)
-          })
-          call.on('rejected', () => {
-            this.incoming_calls.delete(call_id)
-          })
-          call.on('ended', () => {
-            this.incoming_calls.delete(call_id)
-          })
           this.incoming_calls.set(call_id, call)
           break
         }

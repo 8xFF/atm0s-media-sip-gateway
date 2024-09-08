@@ -1,11 +1,21 @@
 import Srf, { SrfRequest, SrfResponse, Dialog } from 'drachtio-srf'
 import { Call, CallAction, CallActionResponse } from './lib'
 import { feedbackStatus, IncallHookResponse } from 'sip/hooks'
-import { Atm0sConfig, createAtm0sToken } from 'sip/atm0s'
 import { rtpDelete, rtpCreateAnswer } from 'sip/reqs'
-import { EventEmitter } from 'stream'
+import { EventEmitter } from 'events'
 
-export type IncomingCallEvent = 'cancel' | 'end'
+export enum IncomingCallEvent {
+  StateChanged = 'StateChanged',
+}
+
+export enum IncomingCallState {
+  Ringing = 'Ringing',
+  Rejected = 'Rejected',
+  Error = 'Error',
+  Canceled = 'Canceled',
+  Accepted = 'Accepted',
+  Ended = 'Ended',
+}
 
 export class IncomingCall extends EventEmitter implements Call {
   uas?: Dialog
@@ -13,7 +23,6 @@ export class IncomingCall extends EventEmitter implements Call {
 
   constructor(
     private srf: Srf,
-    private atm0s: Atm0sConfig,
     private req: SrfRequest,
     private res: SrfResponse,
     private call: IncallHookResponse,
@@ -28,14 +37,12 @@ export class IncomingCall extends EventEmitter implements Call {
   /** Internal handle */
   onCanceled = async () => {
     console.log('[IncomingCall] OnCanceled')
-    this.emit('canceled')
-    feedbackStatus(this.call.hook, { state: 'Canceled' })
+    this.fireEvent(IncomingCallState.Canceled)
   }
 
   onRejected = async () => {
     console.log('[IncomingCall] OnRejected')
-    this.emit('rejected')
-    feedbackStatus(this.call.hook, { state: 'Rejected' })
+    this.fireEvent(IncomingCallState.Rejected)
   }
 
   onEnded = async () => {
@@ -45,30 +52,24 @@ export class IncomingCall extends EventEmitter implements Call {
       await rtpDelete(this.rtpEndpoint)
       delete this.rtpEndpoint
     }
-    feedbackStatus(this.call.hook, { state: 'Ended' })
+    this.fireEvent(IncomingCallState.Ended)
   }
 
   async onAccepted(): Promise<void> {
-    const atm0s_token = await createAtm0sToken(
-      this.atm0s,
-      this.call.room_id,
-      this.call.peer_id,
-    )
-    console.log('[IncomingCall] create atm0s token', atm0s_token)
     const { endpoint, sdp } = await rtpCreateAnswer(
-      this.atm0s.gateway,
+      this.call.streaming.gateway,
       this.req.body,
-      atm0s_token,
+      this.call.streaming.token,
     )
     console.log('[IncomingCall] create atm0s sdp', endpoint, sdp)
-    this.rtpEndpoint = this.atm0s.gateway + endpoint
+    this.rtpEndpoint = this.call.streaming.gateway + endpoint
     this.uas = await this.srf.createUAS(this.req, this.res, {
       localSdp: sdp,
     })
     this.uas.on('destroy', () => {
       this.onEnded()
     })
-    feedbackStatus(this.call.hook, { state: 'Accepted' })
+    this.fireEvent(IncomingCallState.Accepted)
   }
 
   /** Call interface: doAction method */
@@ -115,11 +116,26 @@ export class IncomingCall extends EventEmitter implements Call {
           message: 'End but not in accepted state',
         }
       }
+      case 'ForceEnd': {
+        if (this.uas) {
+          this.uas.destroy()
+          return { status: true, message: 'Ended' }
+        } else {
+          await this.res.send(486) //Busy
+          await this.onRejected()
+          return { status: true, message: 'Rejected' }
+        }
+      }
     }
     return {
       status: false,
       error: 'UNSUPPORTED_ACTION',
       message: 'Unsupported action',
     }
+  }
+
+  fireEvent(state: IncomingCallState) {
+    this.emit(IncomingCallEvent.StateChanged, state)
+    feedbackStatus(this.call.hook, { state, direction: 'in' })
   }
 }
