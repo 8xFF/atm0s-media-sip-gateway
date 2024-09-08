@@ -1,18 +1,18 @@
 {
-  "name": "drachtio-sip-sample",
+  "name": "atm0s-media-sip-gateway",
   "version": "1.0.0",
   "description": "",
-  "main": "./dist/index.js",
-  "module": "./lib/index.js",
+  "main": "./dist/server.js",
+  "module": "./lib/server.js",
   "files": [
     "lib/"
   ],
   "scripts": {
-    "start": "NODE_PATH=dist/ node dist/index.js",
+    "start": "NODE_PATH=dist/ node dist/server.js",
     "prebuild": "rm -rf dist",
     "build": "tsc",
     "watch": "tsc -w",
-    "server": "tsc && NODE_PATH=dist/ node dist/index.js",
+    "dev": "tsc && NODE_PATH=dist/ node dist/server.js",
     "libbuild": "rm -rf lib && tsc -p tsconfig.module.json",
     "lint": "eslint --ext .ts .",
     "lintfix": "eslint --fix --ext .ts .",
@@ -40,9 +40,9 @@
   "dependencies": {
     "@fastify/swagger": "^8.15.0",
     "@fastify/swagger-ui": "^4.1.0",
+    "@fastify/websocket": "^10.0.1",
     "dotenv": "^16.4.5",
     "drachtio-srf": "4.5.39",
-    "fastify": "^4.28.1",
-    "rtpengine-client": "^0.4.12"
+    "fastify": "^4.28.1"
   }
 }
