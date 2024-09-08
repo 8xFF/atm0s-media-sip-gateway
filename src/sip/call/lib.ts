@@ -1,4 +1,4 @@
-export type CallAction = 'Cancel' | 'Reject' | 'Accept' | 'End'
+export type CallAction = 'Cancel' | 'Reject' | 'Accept' | 'End' | 'ForceEnd'
 
 export interface CallCfg {
   hook: string

@@ -1,10 +1,25 @@
 import Srf, { Dialog, SrfRequest, SrfResponse } from 'drachtio-srf'
 import { Call, CallAction, CallActionResponse } from './lib'
-import { Atm0sConfig, createAtm0sToken } from 'sip/atm0s'
 import { rtpCreateOffer, rtpDelete, rtpSetAnswer } from 'sip/reqs'
-import { EventEmitter } from 'stream'
+import { EventEmitter } from 'events'
 import { feedbackStatus } from 'sip/hooks'
 import { DRACHTIO_CONFIG } from 'config'
+import { StreamingInfo } from 'schemes/make_call'
+
+export enum OutgoingCallEvent {
+  StateChanged = 'StateChanged',
+}
+
+export enum OutgoingCallState {
+  Preparing = 'Preparing',
+  Dialing = 'Dialing',
+  Ringing = 'Ringing',
+  Rejected = 'Rejected',
+  Error = 'Error',
+  Canceled = 'Canceled',
+  Accepted = 'Accepted',
+  Ended = 'Ended',
+}
 
 export class OutgoingCall extends EventEmitter implements Call {
   callId = 'out-' + new Date().getTime()
@@ -15,23 +30,24 @@ export class OutgoingCall extends EventEmitter implements Call {
 
   constructor(
     private srf: Srf,
-    private atm0s: Atm0sConfig,
     private from: string,
     private to: string,
     private dest: string, // destination sip example: 123.123.123.123:5060
     private hook: string,
-    private room: string,
-    private peer: string,
+    private streaming: StreamingInfo,
   ) {
     super()
   }
 
   async makeCall() {
-    const token = await createAtm0sToken(this.atm0s, this.room, this.peer)
-    console.log('[OutgoingCall] create atm0s token', token)
-    const { endpoint, sdp } = await rtpCreateOffer(this.atm0s.gateway, token)
-    this.rtpEndpoint = this.atm0s.gateway + endpoint
+    this.fireEvent(OutgoingCallState.Preparing)
+    const { endpoint, sdp } = await rtpCreateOffer(
+      this.streaming.gateway,
+      this.streaming.token,
+    )
+    this.rtpEndpoint = this.streaming.gateway + endpoint
     console.log('[OutgoingCall] create atm0s sdp', this.rtpEndpoint, sdp)
+    this.fireEvent(OutgoingCallState.Dialing)
     this.srf.createUAC(
       `sip:${this.to}@${this.dest}`,
       {
@@ -47,6 +63,9 @@ export class OutgoingCall extends EventEmitter implements Call {
         },
         cbProvisional: (res: SrfResponse) => {
           console.log('[OutgoingCall] res provisional', res.status, res.body)
+          if (res.status == 180) {
+            this.fireEvent(OutgoingCallState.Ringing)
+          }
           if (res.body) {
             // TODO how to handle early media
           }
@@ -57,6 +76,7 @@ export class OutgoingCall extends EventEmitter implements Call {
         if (err) {
           console.log('[OutgoingCall] Outgoing error', err.status)
 
+          // TODO handle for getting Cancel or Rejected or Error
           this.onRejected()
         } else {
           console.log(
@@ -80,7 +100,7 @@ export class OutgoingCall extends EventEmitter implements Call {
     console.log('[OutgoingCall] OnAccept')
     this.emit('accepted')
     await rtpSetAnswer(this.rtpEndpoint!, sdp)
-    feedbackStatus(this.hook, { state: 'Accepted' })
+    this.fireEvent(OutgoingCallState.Accepted)
   }
 
   onCanceled = async () => {
@@ -89,7 +109,7 @@ export class OutgoingCall extends EventEmitter implements Call {
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
     }
-    feedbackStatus(this.hook, { state: 'Canceled' })
+    this.fireEvent(OutgoingCallState.Canceled)
   }
 
   onRejected = async () => {
@@ -98,7 +118,7 @@ export class OutgoingCall extends EventEmitter implements Call {
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
     }
-    feedbackStatus(this.hook, { state: 'Rejected' })
+    this.fireEvent(OutgoingCallState.Rejected)
   }
 
   onEnded = async () => {
@@ -107,7 +127,7 @@ export class OutgoingCall extends EventEmitter implements Call {
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
     }
-    feedbackStatus(this.hook, { state: 'Ended' })
+    this.fireEvent(OutgoingCallState.Ended)
   }
 
   /** Call interface: doAction method */
@@ -147,11 +167,40 @@ export class OutgoingCall extends EventEmitter implements Call {
           }
         }
       }
+      case 'ForceEnd': {
+        if (this.uac) {
+          this.uac.destroy()
+          this.uac = undefined
+          await this.onEnded()
+          return { status: true, message: 'Ended' }
+        } else if (this.req) {
+          this.req.cancel(() => {
+            return {}
+          })
+          this.req = undefined
+          await this.onCanceled()
+          return { status: true, message: 'Canceled' }
+        } else {
+          console.log(
+            '[OutgoingCall] Call received ForceEnd but req and uac not defined',
+          )
+          return {
+            status: false,
+            error: 'WRONG_STATE',
+            message: 'ForceEnd but req and uac not defined',
+          }
+        }
+      }
     }
     return {
       status: false,
       error: 'UNSUPPORTED_ACTION',
       message: 'Unsupported action',
     }
+  }
+
+  fireEvent(state: OutgoingCallState) {
+    this.emit(OutgoingCallEvent.StateChanged, state)
+    feedbackStatus(this.hook, { state, direction: 'out' })
   }
 }

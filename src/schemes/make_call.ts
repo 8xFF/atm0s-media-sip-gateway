@@ -1,14 +1,16 @@
 import { FastifySchema } from 'fastify'
 
+export interface StreamingInfo {
+  gateway: string
+  token: string
+}
+
 export interface MakeCallRequest {
   sip_server: string
   from_number: string
   to_number: string
   hook: string
-  streaming: {
-    room_id: string
-    peer_id: string
-  }
+  streaming: StreamingInfo
 }
 
 export interface MakeCallResponse {
@@ -43,14 +45,20 @@ export const MAKE_CALL_SCHEMA: FastifySchema = {
       streaming: {
         type: 'object',
         properties: {
-          room_id: {
+          gateway: {
             type: 'string',
           },
-          peer_id: {
+          token: {
+            type: 'string',
+          },
+          room: {
+            type: 'string',
+          },
+          peer: {
             type: 'string',
           },
         },
-        required: ['room_id', 'peer_id'],
+        required: ['room', 'peer', 'gateway', 'token'],
       },
     },
     required: ['from_number', 'to_number', 'hook', 'streaming'],
@@ -74,8 +82,11 @@ export const MAKE_CALL_SCHEMA: FastifySchema = {
             call_id: {
               type: 'string',
             },
+            ws: {
+              type: 'string',
+            },
           },
-          required: ['call_id'],
+          required: ['call_id', 'ws'],
         },
       },
       required: ['status'],

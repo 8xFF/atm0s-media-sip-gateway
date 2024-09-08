@@ -2,6 +2,7 @@ export async function rtpCreateOffer(
   gateway: string,
   token: string,
 ): Promise<{ endpoint: string; sdp: string }> {
+  console.log('rtpCreateOffer:', gateway, token)
   const res = await fetch(gateway + '/rtpengine/offer', {
     headers: {
       Accept: 'application/sdp',
@@ -16,7 +17,7 @@ export async function rtpCreateOffer(
     return { endpoint, sdp }
   } else {
     const content = await res.text()
-    throw new Error(content)
+    throw new Error(res.statusText + ':' + content)
   }
 }
 
@@ -25,6 +26,7 @@ export async function rtpCreateAnswer(
   sdp: string,
   token: string,
 ): Promise<{ endpoint: string; sdp: string }> {
+  console.log('rtpCreateAnswer:', gateway)
   const res = await fetch(gateway + '/rtpengine/answer', {
     headers: {
       Accept: 'application/sdp',
