@@ -79,7 +79,7 @@ export const MAKE_CALL_SCHEMA: FastifySchema = {
         required: ['room', 'peer', 'gateway', 'token'],
       },
     },
-    required: ['from_number', 'to_number', 'hook', 'streaming'],
+    required: ['sip_server', 'from_number', 'to_number', 'hook', 'streaming'],
   },
   response: {
     200: {
