@@ -39,9 +39,9 @@ async function boot() {
     sipGw.callAction(call_id, 'ForceEnd')
   })
 
-  sipGw.on(SipCallEvent.StateChanged, ([call_id, state]) => {
-    console.log('Call', call_id, 'updated to new state', state)
-    wsGw.fire(call_id, { state })
+  sipGw.on(SipCallEvent.StateChanged, ([call_id, status]) => {
+    console.log('Call', call_id, 'updated to new state', status)
+    wsGw.fire(call_id, status)
   })
 
   await fastify.register(fastifyWebsocket)

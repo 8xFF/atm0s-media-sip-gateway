@@ -3,7 +3,6 @@ import { Call, CallAction, CallActionResponse } from './lib'
 import { rtpCreateOffer, rtpDelete, rtpSetAnswer } from 'sip/reqs'
 import { EventEmitter } from 'events'
 import { feedbackStatus } from 'sip/hooks'
-import { DRACHTIO_CONFIG } from 'config'
 import { StreamingInfo } from 'schemes/make_call'
 
 export enum OutgoingCallEvent {
@@ -12,9 +11,8 @@ export enum OutgoingCallEvent {
 
 export enum OutgoingCallState {
   Preparing = 'Preparing',
-  Dialing = 'Dialing',
-  Ringing = 'Ringing',
-  Rejected = 'Rejected',
+  Connecting = 'Connecting',
+  Provisioning = 'Provisioning',
   Error = 'Error',
   Canceled = 'Canceled',
   Accepted = 'Accepted',
@@ -47,13 +45,13 @@ export class OutgoingCall extends EventEmitter implements Call {
     )
     this.rtpEndpoint = this.streaming.gateway + endpoint
     console.log('[OutgoingCall] create atm0s sdp', this.rtpEndpoint, sdp)
-    this.fireEvent(OutgoingCallState.Dialing)
+    this.fireEvent(OutgoingCallState.Connecting)
     this.srf.createUAC(
       `sip:${this.to}@${this.dest}`,
       {
         localSdp: sdp,
         headers: {
-          From: `sip:${this.from}@${DRACHTIO_CONFIG.sip_server}`,
+          From: `sip:${this.from}@${this.dest}`,
         },
       },
       {
@@ -63,9 +61,7 @@ export class OutgoingCall extends EventEmitter implements Call {
         },
         cbProvisional: (res: SrfResponse) => {
           console.log('[OutgoingCall] res provisional', res.status, res.body)
-          if (res.status == 180) {
-            this.fireEvent(OutgoingCallState.Ringing)
-          }
+          this.fireEvent(OutgoingCallState.Provisioning, res.status)
           if (res.body) {
             // TODO how to handle early media
           }
@@ -75,9 +71,7 @@ export class OutgoingCall extends EventEmitter implements Call {
         this.uac = uac
         if (err) {
           console.log('[OutgoingCall] Outgoing error', err.status)
-
-          // TODO handle for getting Cancel or Rejected or Error
-          this.onRejected()
+          this.onError(err.status)
         } else {
           console.log(
             '[OutgoingCall] Outgoing answer',
@@ -88,7 +82,7 @@ export class OutgoingCall extends EventEmitter implements Call {
           uac.on('destroy', () => {
             this.onEnded()
           })
-          this.onAccepted(uac.remote.sdp)
+          this.onAccepted(uac.remote.sdp, (uac as any).res?.status)
         }
       },
     )
@@ -96,38 +90,34 @@ export class OutgoingCall extends EventEmitter implements Call {
   }
 
   /** Internal handle, this function don't act with sip, only stream or fire event */
-  onAccepted = async (sdp: string) => {
-    console.log('[OutgoingCall] OnAccept')
-    this.emit('accepted')
+  onAccepted = async (sdp: string, code?: number) => {
+    console.log('[OutgoingCall] OnAccept', code)
     await rtpSetAnswer(this.rtpEndpoint!, sdp)
-    this.fireEvent(OutgoingCallState.Accepted)
+    this.fireEvent(OutgoingCallState.Accepted, code)
   }
 
   onCanceled = async () => {
     console.log('[OutgoingCall] OnCanceled')
-    this.emit('canceled')
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
     }
     this.fireEvent(OutgoingCallState.Canceled)
   }
 
-  onRejected = async () => {
-    console.log('[OutgoingCall] OnRejected')
-    this.emit('rejected')
+  onError = async (code: number) => {
+    console.log('[OutgoingCall] OnError', code)
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
     }
-    this.fireEvent(OutgoingCallState.Rejected)
+    this.fireEvent(OutgoingCallState.Error, code)
   }
 
-  onEnded = async () => {
+  onEnded = async (code?: number) => {
     console.log('[OutgoingCall] OnDestroy')
-    this.emit('ended')
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
     }
-    this.fireEvent(OutgoingCallState.Ended)
+    this.fireEvent(OutgoingCallState.Ended, code)
   }
 
   /** Call interface: doAction method */
@@ -199,8 +189,8 @@ export class OutgoingCall extends EventEmitter implements Call {
     }
   }
 
-  fireEvent(state: OutgoingCallState) {
-    this.emit(OutgoingCallEvent.StateChanged, state)
-    feedbackStatus(this.hook, { state, direction: 'out' })
+  fireEvent(state: OutgoingCallState, code?: number) {
+    this.emit(OutgoingCallEvent.StateChanged, { state, direction: 'out', code })
+    feedbackStatus(this.hook, { state, direction: 'out', code })
   }
 }

@@ -1,5 +1,10 @@
 import Srf, { SrfConfig, SrfRequest, SrfResponse } from 'drachtio-srf'
-import { feedbackStatus, hookIncoming, syncAllowedNumbers } from './hooks'
+import {
+  CallUpdateStatus,
+  feedbackStatus,
+  hookIncoming,
+  syncAllowedNumbers,
+} from './hooks'
 import {
   IncomingCall,
   IncomingCallEvent,
@@ -112,11 +117,10 @@ export class SipGateway extends EventEmitter {
     await outgoing_call.makeCall()
     outgoing_call.on(
       OutgoingCallEvent.StateChanged,
-      (state: OutgoingCallState) => {
-        this.emit(SipCallEvent.StateChanged, [call_id, state])
-        switch (state) {
+      (status: CallUpdateStatus) => {
+        this.emit(SipCallEvent.StateChanged, [call_id, status])
+        switch (status.state) {
           case OutgoingCallState.Canceled:
-          case OutgoingCallState.Rejected:
           case OutgoingCallState.Error:
           case OutgoingCallState.Ended:
             this.outgoing_calls.delete(call_id)
@@ -175,7 +179,10 @@ export class SipGateway extends EventEmitter {
 
       if (canceled) {
         console.log('Call canceled from caller', call_id)
-        feedbackStatus(response.hook, { state: 'Canceled', direction: 'in' })
+        feedbackStatus(response.hook, {
+          state: IncomingCallState.Canceled,
+          direction: 'in',
+        })
         return
       }
 

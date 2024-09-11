@@ -13,7 +13,6 @@ export const DRACHTIO_CONFIG = {
   host: process.env.DRACHTIO_HOST || '127.0.0.1',
   port: parseInt(process.env.DRACHTIO_PORT || '9022'),
   secret: process.env.DRACHTIO_SECRET || '',
-  sip_server: process.env.DRACHTIO_SIP_SERVER || '127.0.0.1:5060',
 }
 
 export const INCOMING_CALL_HOOK =
