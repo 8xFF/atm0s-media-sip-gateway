@@ -3,7 +3,7 @@ import { Call, CallAction, CallActionResponse } from './lib'
 import { rtpCreateOffer, rtpDelete, rtpSetAnswer } from 'sip/reqs'
 import { EventEmitter } from 'events'
 import { feedbackStatus } from 'sip/hooks'
-import { StreamingInfo } from 'schemes/make_call'
+import { SipAuth, StreamingInfo } from 'schemes/make_call'
 
 export enum OutgoingCallEvent {
   StateChanged = 'StateChanged',
@@ -30,7 +30,8 @@ export class OutgoingCall extends EventEmitter implements Call {
     private srf: Srf,
     private from: string,
     private to: string,
-    private dest: string, // destination sip example: 123.123.123.123:5060
+    private sip_server: string, // destination sip example: 123.123.123.123:5060
+    private sip_auth: SipAuth | undefined,
     private hook: string,
     private streaming: StreamingInfo,
   ) {
@@ -47,12 +48,13 @@ export class OutgoingCall extends EventEmitter implements Call {
     console.log('[OutgoingCall] create atm0s sdp', this.rtpEndpoint, sdp)
     this.fireEvent(OutgoingCallState.Connecting)
     this.srf.createUAC(
-      `sip:${this.to}@${this.dest}`,
+      `sip:${this.to}@${this.sip_server}`,
       {
         localSdp: sdp,
         headers: {
-          From: `sip:${this.from}@${this.dest}`,
+          From: `sip:${this.from}@${this.sip_server}`,
         },
+        auth: this.sip_auth,
       },
       {
         cbRequest: (err: any, req: SrfRequest) => {

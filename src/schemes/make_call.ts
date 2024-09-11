@@ -5,8 +5,14 @@ export interface StreamingInfo {
   token: string
 }
 
+export interface SipAuth {
+  username: string
+  password: string
+}
+
 export interface MakeCallRequest {
   sip_server: string
+  sip_auth?: SipAuth
   from_number: string
   to_number: string
   hook: string
@@ -32,6 +38,18 @@ export const MAKE_CALL_SCHEMA: FastifySchema = {
     properties: {
       sip_server: {
         type: 'string',
+      },
+      sip_auth: {
+        type: 'object',
+        properties: {
+          username: {
+            type: 'string',
+          },
+          password: {
+            type: 'string',
+          },
+        },
+        required: ['username', 'password'],
       },
       from_number: {
         type: 'string',

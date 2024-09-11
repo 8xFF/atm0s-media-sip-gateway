@@ -78,6 +78,7 @@ async function boot() {
       const body = req.body as MakeCallRequest
       const call_id = await sipGw.makeCall(
         body.sip_server,
+        body.sip_auth,
         body.from_number,
         body.to_number,
         body.hook,

@@ -17,7 +17,7 @@ import {
 } from './call/outgoing_call'
 import { CallAction } from './call/lib'
 import EventEmitter from 'events'
-import { StreamingInfo } from 'schemes/make_call'
+import { SipAuth, StreamingInfo } from 'schemes/make_call'
 
 export enum SipCallEvent {
   StateChanged = 'StateChanged',
@@ -100,6 +100,7 @@ export class SipGateway extends EventEmitter {
 
   async makeCall(
     sip_server: string,
+    sip_auth: SipAuth | undefined,
     from_number: string,
     to_number: string,
     status_hook: string,
@@ -111,6 +112,7 @@ export class SipGateway extends EventEmitter {
       from_number,
       to_number,
       sip_server,
+      sip_auth,
       status_hook,
       streaming,
     )
