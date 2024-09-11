@@ -1,14 +1,8 @@
 import { StreamingInfo } from 'schemes/make_call'
+import { OutgoingCallState } from './call/outgoing_call'
+import { IncomingCallState } from './call/incoming_call'
 
-export type CallState =
-  | 'Preparing'
-  | 'Dialing'
-  | 'Error'
-  | 'Ringing'
-  | 'Accepted'
-  | 'Rejected'
-  | 'Canceled'
-  | 'Ended'
+export type CallState = OutgoingCallState | IncomingCallState
 
 export interface IncallHookRequest {
   call_id: string
@@ -27,6 +21,7 @@ export interface IncallHookResponse {
 export interface CallUpdateStatus {
   direction: 'in' | 'out'
   state: CallState
+  code?: number
 }
 
 export interface AllowedNumber {

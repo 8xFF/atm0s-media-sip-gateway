@@ -47,7 +47,6 @@ export class IncomingCall extends EventEmitter implements Call {
 
   onEnded = async () => {
     console.log('[IncomingCall] OnEnded')
-    this.emit('ended')
     if (this.rtpEndpoint) {
       await rtpDelete(this.rtpEndpoint)
       delete this.rtpEndpoint
