@@ -16,11 +16,10 @@ export const DRACHTIO_CONFIG = {
 }
 
 export const INCOMING_CALL_HOOK =
-  process.env.INCOMING_CALL_HOOK || 'http://localhost:3000'
+  process.env.INCOMING_CALL_HOOK || 'http://localhost:4222/hook/sip/call'
 
-export const ALLOWED_NUMBERS_SYNC = process.env.ALLOWED_NUMBERS_SYNC
-
-export const ENABLE_REGISTER = process.env.ENABLE_REGISTER === 'true'
+export const ALLOWED_NUMBERS_SYNC =
+  process.env.ALLOWED_NUMBERS_SYNC || 'http://localhost:4222/hook/sip/numbers'
 
 export const SECRET = process.env.SECRET || 'insecure'
 export const PORT = parseInt(process.env.PORT || '5000')

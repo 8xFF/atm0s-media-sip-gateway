@@ -18,6 +18,7 @@ import {
 import { CallAction } from './call/lib'
 import EventEmitter from 'events'
 import { SipAuth, StreamingInfo } from 'schemes/make_call'
+import { Netmask } from 'netmask'
 
 export enum SipCallEvent {
   StateChanged = 'StateChanged',
@@ -32,7 +33,6 @@ export class SipGateway extends EventEmitter {
   constructor(
     private config: SrfConfig,
     private incoming_hook: string,
-    private enable_register: boolean,
     private allowed_numbers_sync: string | undefined,
   ) {
     super()
@@ -55,16 +55,6 @@ export class SipGateway extends EventEmitter {
         console.error('handle invite error', err)
       }
     })
-    if (enable_register) {
-      const srf2 = this.srf as any
-      srf2.register(async (req: SrfRequest, res: SrfResponse) => {
-        try {
-          return await this.onRegister(req, res)
-        } catch (err) {
-          console.error('handle register error', err)
-        }
-      })
-    }
 
     if (this.allowed_numbers_sync) {
       this.syncAllowed()
@@ -80,7 +70,7 @@ export class SipGateway extends EventEmitter {
     const numbers = await syncAllowedNumbers(this.allowed_numbers_sync!)
     this.allowed_numbers.clear()
     numbers.forEach((allowed) => {
-      this.allowed_numbers.set(allowed.number, allowed.sip_server)
+      this.allowed_numbers.set(allowed.number, allowed.subnet)
     })
   }
 
@@ -136,10 +126,6 @@ export class SipGateway extends EventEmitter {
   }
 
   /** handle from srf callback */
-  private onRegister = async (req: SrfRequest, res: SrfResponse) => {
-    res.send(200)
-  }
-
   private onInvite = async (req: SrfRequest, res: SrfResponse) => {
     const call_id = req.headers['call-id']
     const from = req.getParsedHeader('from')
@@ -148,14 +134,20 @@ export class SipGateway extends EventEmitter {
 
     const from_peer = (Srf as any).parseUri(from.uri).user
     const to_peer = (Srf as any).parseUri(to.uri).user
+    const allowed_subnet = this.allowed_numbers.get(to_peer)
 
     if (
-      this.allowed_numbers_sync ||
-      this.allowed_numbers.get(to_peer) == sip_server
+      allowed_subnet &&
+      new Netmask(allowed_subnet).contains(req.source_address)
     ) {
       console.log('Call from', sip_server, call_id, from_peer, to_peer)
     } else {
-      console.warn('Call from untrusted source', sip_server, to_peer)
+      console.warn(
+        'Call from untrusted source',
+        allowed_subnet,
+        sip_server,
+        to_peer,
+      )
       res.send(406) //trying
       return
     }
@@ -179,7 +171,7 @@ export class SipGateway extends EventEmitter {
       req2.off('cancel', handle_cancel)
       console.log('Call response', call_id, response)
 
-      if (canceled) {
+      if (canceled && response.hook) {
         console.log('Call canceled from caller', call_id)
         feedbackStatus(response.hook, {
           state: IncomingCallState.Canceled,
@@ -190,7 +182,13 @@ export class SipGateway extends EventEmitter {
 
       switch (response.state) {
         case 'Accepted': {
-          const call = new IncomingCall(this.srf, req, res, response)
+          const call = new IncomingCall(
+            this.srf,
+            req,
+            res,
+            response.hook!,
+            response.streaming!,
+          )
           await call.onAccepted()
           call.on(
             IncomingCallEvent.StateChanged,
@@ -207,13 +205,19 @@ export class SipGateway extends EventEmitter {
           this.incoming_calls.set(call_id, call)
           break
         }
-        case 'Canceled': {
+        case 'Rejected': {
           res.send(486) //busy now
           break
         }
         case 'Ringing': {
           res.send(180) //ringing
-          const call = new IncomingCall(this.srf, req, res, response)
+          const call = new IncomingCall(
+            this.srf,
+            req,
+            res,
+            response.hook!,
+            response.streaming!,
+          )
           call.on(
             IncomingCallEvent.StateChanged,
             ({ state }: { state: IncomingCallState }) => {
@@ -228,6 +232,10 @@ export class SipGateway extends EventEmitter {
             },
           )
           this.incoming_calls.set(call_id, call)
+          break
+        }
+        default: {
+          res.send(486) //busy now
           break
         }
       }

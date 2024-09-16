@@ -1,6 +1,7 @@
 import { StreamingInfo } from 'schemes/make_call'
 import { OutgoingCallState } from './call/outgoing_call'
 import { IncomingCallState } from './call/incoming_call'
+import { SECRET } from 'config'
 
 export type CallState = OutgoingCallState | IncomingCallState
 
@@ -13,9 +14,9 @@ export interface IncallHookRequest {
 }
 
 export interface IncallHookResponse {
-  state: 'Ringing' | 'Canceled' | 'Accepted'
-  hook: string
-  streaming: StreamingInfo
+  state: 'Ringing' | 'Rejected' | 'Accepted'
+  hook?: string
+  streaming?: StreamingInfo
 }
 
 export interface CallUpdateStatus {
@@ -25,13 +26,18 @@ export interface CallUpdateStatus {
 }
 
 export interface AllowedNumber {
-  sip_server: string
+  subnet: string
   number: string
 }
 
-export async function fetchPostJson<I, O>(url: string, body: I): Promise<O> {
+export async function fetchPostJson<I, O>(
+  url: string,
+  body: I,
+  headers?: any,
+): Promise<O> {
   const res = await fetch(url, {
     headers: {
+      ...headers,
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
@@ -89,6 +95,7 @@ export async function hookIncoming(
       to_number,
       ws: '/ws/call/' + call_id,
     },
+    { 'X-API-Key': SECRET },
   )
   return response
 }
@@ -96,6 +103,21 @@ export async function hookIncoming(
 export async function syncAllowedNumbers(
   url: string,
 ): Promise<AllowedNumber[]> {
-  const res = await fetch(url)
-  return res.json()
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'X-API-Key': SECRET,
+      },
+    })
+    const res_json = await res.json()
+    if (res_json.status) {
+      return res_json.data
+    } else {
+      console.log('sync allowed numbers error', res_json.error)
+      return []
+    }
+  } catch (e) {
+    console.error('sync allowed numbers error', e)
+    return []
+  }
 }

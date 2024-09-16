@@ -1,7 +1,6 @@
 import {
   ALLOWED_NUMBERS_SYNC,
   DRACHTIO_CONFIG,
-  ENABLE_REGISTER,
   INCOMING_CALL_HOOK,
   PORT,
   SECRET,
@@ -25,7 +24,6 @@ async function boot() {
   const sipGw = new SipGateway(
     DRACHTIO_CONFIG,
     INCOMING_CALL_HOOK,
-    ENABLE_REGISTER,
     ALLOWED_NUMBERS_SYNC,
   )
   await sipGw.connect()

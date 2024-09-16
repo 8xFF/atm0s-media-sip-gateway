@@ -1,8 +1,9 @@
 import Srf, { SrfRequest, SrfResponse, Dialog } from 'drachtio-srf'
 import { Call, CallAction, CallActionResponse } from './lib'
-import { feedbackStatus, IncallHookResponse } from 'sip/hooks'
+import { feedbackStatus } from 'sip/hooks'
 import { rtpDelete, rtpCreateAnswer } from 'sip/reqs'
 import { EventEmitter } from 'events'
+import { StreamingInfo } from 'schemes/make_call'
 
 export enum IncomingCallEvent {
   StateChanged = 'StateChanged',
@@ -25,7 +26,8 @@ export class IncomingCall extends EventEmitter implements Call {
     private srf: Srf,
     private req: SrfRequest,
     private res: SrfResponse,
-    private call: IncallHookResponse,
+    private hook: string,
+    private streaming: StreamingInfo,
   ) {
     super()
     const req2 = req as any
@@ -56,12 +58,12 @@ export class IncomingCall extends EventEmitter implements Call {
 
   async onAccepted(): Promise<void> {
     const { endpoint, sdp } = await rtpCreateAnswer(
-      this.call.streaming.gateway,
+      this.streaming.gateway,
       this.req.body,
-      this.call.streaming.token,
+      this.streaming.token,
     )
     console.log('[IncomingCall] create atm0s sdp', endpoint, sdp)
-    this.rtpEndpoint = this.call.streaming.gateway + endpoint
+    this.rtpEndpoint = this.streaming.gateway + endpoint
     this.uas = await this.srf.createUAS(this.req, this.res, {
       localSdp: sdp,
     })
@@ -133,8 +135,8 @@ export class IncomingCall extends EventEmitter implements Call {
     }
   }
 
-  fireEvent(state: IncomingCallState) {
-    this.emit(IncomingCallEvent.StateChanged, state)
-    feedbackStatus(this.call.hook, { state, direction: 'in' })
+  fireEvent(state: IncomingCallState, code?: number) {
+    this.emit(IncomingCallEvent.StateChanged, { state, direction: 'in', code })
+    feedbackStatus(this.hook, { state, direction: 'in', code })
   }
 }
