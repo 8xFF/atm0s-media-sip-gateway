@@ -23,6 +23,9 @@ dependencies:
   fastify:
     specifier: ^4.28.1
     version: 4.28.1
+  netmask:
+    specifier: ^2.0.2
+    version: 2.0.2
 
 devDependencies:
   '@types/chai':
@@ -31,6 +34,9 @@ devDependencies:
   '@types/mocha':
     specifier: ^10.0.7
     version: 10.0.7
+  '@types/netmask':
+    specifier: ^2.0.5
+    version: 2.0.5
   '@types/node':
     specifier: ^20.14.11
     version: 20.14.11
@@ -265,6 +271,10 @@ packages:
 
   /@types/mocha@10.0.7:
     resolution: {integrity: sha512-GN8yJ1mNTcFcah/wKEFIJckJx9iJLoMSzWcfRRuxz/Jk+U6KQNnml+etbtxFK8lPjzOw3zp4Ha/kjSst9fsHYw==}
+    dev: true
+
+  /@types/netmask@2.0.5:
+    resolution: {integrity: sha512-9Q5iw9+pHZBVLDG700dlQSWWHTYvOb8KfPjfQTNckCYky4IyjV2xh81+RgC1CCwqv92bYLpz1cVKyJav0B88uQ==}
     dev: true
 
   /@types/node@20.14.11:
@@ -1462,6 +1472,11 @@ packages:
   /natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
     dev: true
+
+  /netmask@2.0.2:
+    resolution: {integrity: sha512-dBpDMdxv9Irdq66304OLfEmQ9tbNRFnFTuZiLo+bD+r332bBmMJ8GBLXklIXXgxd3+v9+KUnZaUR5PJMa75Gsg==}
+    engines: {node: '>= 0.4.0'}
+    dev: false
 
   /node-noop@0.0.1:
     resolution: {integrity: sha512-kAUvIRxZyDYFTLqGj+7zqXduG89vtqGmNMt9qDMvYH3H8uNTCOTz5ZN1q2Yg8++fWbzv+ERtYVqaOH42Ag5OpA==}
