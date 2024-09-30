@@ -1,0 +1,39 @@
+[package]
+name = "rust-sip-wp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async-trait = "0.1.83"
+clap = { version = "4.5.18", features = ["derive", "env"] }
+derive_more = { version = "1.0.0", features = [
+    "from",
+    "display",
+    "deref",
+    "into",
+] }
+ezk-sdp-types = { git = "https://github.com/giangndm/ezk.git", rev = "fa946fa6517596b5c189cac9d9cdf8ad8379f170" }
+ezk-sip-auth = { git = "https://github.com/giangndm/ezk.git", rev = "fa946fa6517596b5c189cac9d9cdf8ad8379f170" }
+ezk-sip-core = { git = "https://github.com/giangndm/ezk.git", rev = "fa946fa6517596b5c189cac9d9cdf8ad8379f170" }
+ezk-sip-types = { git = "https://github.com/giangndm/ezk.git", rev = "fa946fa6517596b5c189cac9d9cdf8ad8379f170" }
+ezk-sip-ua = { git = "https://github.com/giangndm/ezk.git", rev = "fa946fa6517596b5c189cac9d9cdf8ad8379f170" }
+ipnet = { version = "2.10.0", features = ["serde"] }
+log = "0.4.22"
+pin-project-lite = "0.2.14"
+poem = { version = "3.1.0", features = ["websocket"] }
+poem-openapi = { version = "5.1.1", features = ["swagger-ui"] }
+rand = "0.8.5"
+reqwest = { version = "0.12.7", features = ["json"] }
+serde = "1.0.210"
+spin = "0.9.8"
+thiserror = "1.0.64"
+tokio = { version = "1.40.0", features = ["full"] }
+tracing-subscriber = "0.3.18"
+bytes = "1.7"
+serde_json = "1.0.128"
+futures-util = "0.3.30"
+bytesstr = "1.0.2"
+jwt-simple = { version = "0.12", default-features = false, features = [
+    "pure-rust",
+] }
+anyhow = "1.0"
