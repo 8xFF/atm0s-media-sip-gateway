@@ -79,10 +79,6 @@ pub enum SipOutgoingCallError {
     EzkCore(#[from] ezk_sip_core::Error),
     #[error("EzkAuthError({0})")]
     EzkAuth(#[from] ezk_sip_auth::Error),
-    #[error("SipError({0})")]
-    Sip(u16),
-    #[error("InternalChannel")]
-    InternalChannel,
     #[error("RtpEngine{0}")]
     RtpEngine(#[from] MediaEngineError),
 }

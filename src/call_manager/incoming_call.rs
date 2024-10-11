@@ -8,11 +8,11 @@ use tokio::sync::{
 
 use crate::{
     error::PrintErrorDetails,
-    futures::select2,
     hook::HttpHookSender,
     protocol::{CallAction, CallActionRequest, CallActionResponse, HookIncomingCallRequest, HookIncomingCallResponse, IncomingCallEvent, InternalCallId},
     sip::{MediaApi, SipIncomingCall, SipIncomingCallOut},
     utils::http_to_ws,
+    utils::select2,
 };
 
 use super::{EmitterId, EventEmitter};

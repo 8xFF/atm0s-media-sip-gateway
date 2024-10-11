@@ -1,24 +1,24 @@
 use std::{io, net::SocketAddr, sync::Arc};
 
-use address_book::AddressBookStorage;
 use call_manager::CallManager;
-use futures::select2;
 use hook::HttpHook;
-use http::{HttpCommand, HttpServer, WebsocketEventEmitter};
-use secure::SecureContext;
+use http::{HttpCommand, HttpServer, WebsocketCallEventEmitter};
 use thiserror::Error;
 use tokio::sync::mpsc::Receiver;
+use utils::select2;
 
-pub mod address_book;
-pub mod call_manager;
+mod address_book;
+mod call_manager;
 mod error;
-pub mod futures;
-pub mod hook;
-pub mod http;
-pub mod protocol;
-pub mod secure;
-pub mod sip;
-pub mod utils;
+mod hook;
+mod http;
+mod protocol;
+mod secure;
+mod sip;
+mod utils;
+
+pub use address_book::{AddressBookStorage, AddressBookSync};
+pub use secure::SecureContext;
 
 #[derive(Error, Debug)]
 pub enum GatewayError {
@@ -32,7 +32,7 @@ pub enum GatewayError {
 
 pub struct Gateway {
     http_rx: Receiver<HttpCommand>,
-    call_manager: CallManager<WebsocketEventEmitter>,
+    call_manager: CallManager<WebsocketCallEventEmitter>,
 }
 
 impl Gateway {

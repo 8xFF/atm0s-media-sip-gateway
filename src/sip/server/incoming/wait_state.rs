@@ -11,9 +11,9 @@ use tokio::sync::{
 
 use crate::{
     error::PrintErrorSimple,
-    futures::select2,
     protocol::{IncomingCallEvent, IncomingCallSipEvent, StreamingInfo},
     sip::{media::MediaRtpEngineAnswer, MediaApi},
+    utils::select2,
 };
 
 use super::{talking_state::TalkingState, Ctx, SipIncomingCallError, State, StateLogic, StateOut};

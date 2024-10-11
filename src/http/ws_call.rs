@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use crate::{
     call_manager::{EmitterId, EventEmitter},
-    futures::select2::{self, OrOutput},
     protocol::{InternalCallId, WsActionResponse, WsMessage},
     secure::SecureContext,
+    utils::select2::{self, OrOutput},
 };
 
 use super::HttpCommand;
@@ -25,20 +25,20 @@ use tokio::sync::{
 };
 
 #[derive(Clone)]
-pub struct WebsocketCtx {
+pub struct WebsocketCallCtx {
     pub secure_ctx: Arc<SecureContext>,
     pub cmd_tx: Sender<HttpCommand>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct WsQuery {
+struct WsQuery {
     token: String,
 }
 
 #[handler]
-pub fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQuery>, ws: WebSocket, data: Data<&WebsocketCtx>) -> impl IntoResponse {
+pub fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQuery>, ws: WebSocket, data: Data<&WebsocketCallCtx>) -> impl IntoResponse {
     let token = query.token;
-    if let Some(token) = data.secure_ctx.decode_token(&token) {
+    if let Some(token) = data.secure_ctx.decode_call_token(&token) {
         if *token.call_id != call_id {
             return Response::builder().status(StatusCode::BAD_REQUEST).finish();
         }
@@ -53,7 +53,7 @@ pub fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQuery>,
         let call_id: InternalCallId = call_id.into();
         let (out_tx, mut out_rx) = unbounded_channel();
         let _out_tx = out_tx.clone(); //we need to store it for avoiding ws error when call dropped
-        let emitter = WebsocketEventEmitter { emitter_id, out_tx: out_tx.clone() };
+        let emitter = WebsocketCallEventEmitter { emitter_id, out_tx: out_tx.clone() };
 
         let (tx, rx) = oneshot::channel();
         if let Err(e) = cmd_tx.send(HttpCommand::SubscribeCall(call_id.clone(), emitter, tx)).await {
@@ -178,12 +178,12 @@ pub fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQuery>,
     .into_response()
 }
 
-pub struct WebsocketEventEmitter {
+pub struct WebsocketCallEventEmitter {
     emitter_id: EmitterId,
     out_tx: UnboundedSender<WsMessage>,
 }
 
-impl EventEmitter for WebsocketEventEmitter {
+impl EventEmitter for WebsocketCallEventEmitter {
     fn emitter_id(&self) -> EmitterId {
         self.emitter_id
     }

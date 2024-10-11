@@ -1,9 +1,9 @@
 use ezk_sip_ua::invite::{create_ack, initiator::Early};
 
 use crate::{
-    futures::select2,
     protocol::{OutgoingCallEvent, OutgoingCallSipEvent},
     sip::server::outgoing::{talking_state::TalkingState, State},
+    utils::select2,
 };
 
 use super::{Ctx, SipOutgoingCallError, StateLogic, StateOut};

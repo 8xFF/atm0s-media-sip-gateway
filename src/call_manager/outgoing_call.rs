@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
-    futures::select2,
     hook::HttpHookSender,
-    protocol::{InternalCallId, OutgoingCallEvent, OutgoingCallSipEvent},
-    sip::{SipOutgoingCall, SipOutgoingCallError, SipOutgoingCallOut},
+    protocol::{InternalCallId, OutgoingCallEvent},
+    sip::{SipOutgoingCall, SipOutgoingCallOut},
+    utils::select2,
 };
 
 use super::{EmitterId, EventEmitter};
@@ -81,12 +81,7 @@ async fn run_call_loop<EM: EventEmitter>(mut call: SipOutgoingCall, mut control_
             }
             select2::OrOutput::Left(Err(e)) => {
                 log::error!("[OutgoingCall] call error {e:?}");
-                let event = if let SipOutgoingCallError::Sip(code) = &e {
-                    OutgoingCallEvent::Sip(OutgoingCallSipEvent::Failure { code: *code })
-                } else {
-                    OutgoingCallEvent::Error { message: e.to_string() }
-                };
-
+                let event = OutgoingCallEvent::Error { message: e.to_string() };
                 let value = serde_json::to_value(&event).expect("should convert to json");
                 for emitter in emitters.values_mut() {
                     emitter.fire(value.clone().into());

@@ -69,6 +69,7 @@ impl MediaApi {
         }
     }
 
+    #[allow(unused)]
     pub async fn create_webrtc_token(&self, room: &str, peer: &str, record: bool) -> Result<String> {
         let res: CreateTokenResponse = reqwest::ClientBuilder::new()
             .timeout(Duration::from_secs(3))

@@ -14,18 +14,21 @@ use tokio::sync::{
 };
 
 mod api_call;
+mod api_token;
 mod header_secret;
 mod response_result;
 mod ws_call;
+mod ws_notify;
 
-use ws_call::WebsocketCtx;
-pub use ws_call::WebsocketEventEmitter;
+use ws_call::WebsocketCallCtx;
+pub use ws_call::WebsocketCallEventEmitter;
+use ws_notify::WebsocketNotifyCtx;
 
 pub enum HttpCommand {
     CreateCall(CreateCallRequest, MediaApi, oneshot::Sender<Result<CreateCallResponse, CallApiError>>),
     ActionCall(InternalCallId, CallActionRequest, oneshot::Sender<anyhow::Result<CallActionResponse>>),
     EndCall(InternalCallId, oneshot::Sender<Result<(), CallApiError>>),
-    SubscribeCall(InternalCallId, WebsocketEventEmitter, oneshot::Sender<Result<(), CallApiError>>),
+    SubscribeCall(InternalCallId, WebsocketCallEventEmitter, oneshot::Sender<Result<(), CallApiError>>),
     UnsubscribeCall(InternalCallId, EmitterId, oneshot::Sender<Result<(), CallApiError>>),
 }
 
@@ -51,31 +54,35 @@ impl HttpServer {
     }
 
     pub async fn run_loop(&mut self) -> io::Result<()> {
-        let call_service: OpenApiService<_, ()> = OpenApiService::new(
-            api_call::CallApis {
-                media_gateway: self.media_gateway.clone(),
-                tx: self.tx.clone(),
-                secure_ctx: self.secure_ctx.clone(),
-            },
-            "Console call APIs",
-            env!("CARGO_PKG_VERSION"),
-        )
-        .server("/")
-        .url_prefix("/call");
+        let call_api = api_call::CallApis {
+            media_gateway: self.media_gateway.clone(),
+            tx: self.tx.clone(),
+            secure_ctx: self.secure_ctx.clone(),
+        };
+        let call_service: OpenApiService<_, ()> = OpenApiService::new(call_api, "Console call APIs", env!("CARGO_PKG_VERSION")).server("/").url_prefix("/call");
         let call_ui = call_service.swagger_ui();
         let call_spec = call_service.spec();
+
+        let token_api = api_token::TokenApis { secure_ctx: self.secure_ctx.clone() };
+        let token_service: OpenApiService<_, ()> = OpenApiService::new(token_api, "Console token APIs", env!("CARGO_PKG_VERSION")).server("/").url_prefix("/token");
+        let token_ui = token_service.swagger_ui();
+        let token_spec = token_service.spec();
 
         let app = Route::new()
             .nest("/call/", call_service)
             .nest("/docs/call/", call_ui)
             .at("/docs/call/spec", poem::endpoint::make_sync(move |_| call_spec.clone()))
+            .nest("/token/", token_service)
+            .nest("/docs/token/", token_ui)
+            .at("/docs/token/spec", poem::endpoint::make_sync(move |_| token_spec.clone()))
             .at(
                 "/ws/call/:call_id",
-                get(ws_call::ws_single_call).data(WebsocketCtx {
+                get(ws_call::ws_single_call).data(WebsocketCallCtx {
                     cmd_tx: self.tx.clone(),
                     secure_ctx: self.secure_ctx.clone(),
                 }),
             )
+            .at("/ws/notify", get(ws_notify::ws_single_notify).data(WebsocketNotifyCtx { secure_ctx: self.secure_ctx.clone() }))
             .with(Tracing::default());
 
         Server::new(TcpListener::bind(self.addr)).run(app).await

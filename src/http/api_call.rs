@@ -40,7 +40,7 @@ impl CallApis {
 
     #[oai(path = "/:call_id/action", method = "post")]
     async fn action_call(&self, Path(call_id): Path<String>, Query(token): Query<String>, data: Json<CallActionRequest>) -> ApiRes<CallActionResponse, CallApiError> {
-        if let Some(token) = self.secure_ctx.decode_token(&token) {
+        if let Some(token) = self.secure_ctx.decode_call_token(&token) {
             if *token.call_id != call_id {
                 return Err(CallApiError::WrongToken.into());
             }
@@ -60,7 +60,7 @@ impl CallApis {
 
     #[oai(path = "/:call_id", method = "delete")]
     async fn encode_call(&self, Query(token): Query<String>, Path(call_id): Path<String>) -> ApiRes<String, CallApiError> {
-        if let Some(token) = self.secure_ctx.decode_token(&token) {
+        if let Some(token) = self.secure_ctx.decode_call_token(&token) {
             if *token.call_id != call_id {
                 return Err(CallApiError::WrongToken.into());
             }

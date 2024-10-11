@@ -4,7 +4,6 @@ use anyhow::anyhow;
 use derive_more::derive::{Display, From};
 use incoming_call::IncomingCall;
 use outgoing_call::OutgoingCall;
-use thiserror::Error;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot,
@@ -13,12 +12,12 @@ use tokio::sync::{
 use crate::{
     address_book::AddressBookStorage,
     error::PrintErrorDetails,
-    futures::select2,
     hook::HttpHook,
     protocol::{CallActionRequest, CallActionResponse, CallApiError, CallDirection, CreateCallRequest, CreateCallResponse, InternalCallId, WsMessage},
     secure::{CallToken, SecureContext},
     sip::{MediaApi, SipServer},
     utils::http_to_ws,
+    utils::select2,
 };
 
 pub mod incoming_call;
@@ -31,14 +30,6 @@ impl EmitterId {
     pub fn rand() -> Self {
         Self(rand::random())
     }
-}
-
-#[derive(Debug, Error)]
-pub enum EventEmitterError {
-    #[error("serialize error")]
-    SerializeError,
-    #[error("internal channel error")]
-    InternalChannel,
 }
 
 pub trait EventEmitter: Send + Sync + 'static {
@@ -89,7 +80,7 @@ impl<EM: EventEmitter> CallManager<EM> {
         match self.sip.make_call(media_api, &from, &to, req.sip_auth, req.streaming) {
             Ok(call) => {
                 let call_id = call.call_id();
-                let call_token = self.secure_ctx.encode_token(
+                let call_token = self.secure_ctx.encode_call_token(
                     CallToken {
                         direction: CallDirection::Outgoing,
                         call_id: call_id.clone(),
@@ -170,7 +161,7 @@ impl<EM: EventEmitter> CallManager<EM> {
                     if let Some(number) = self.address_book.allow(call.remote(), call.from(), call.to()) {
                         let hook_sender = self.http_hook.new_sender(&number.hook, HashMap::new());
                         let call_id = call.call_id();
-                        let call_token = self.secure_ctx.encode_token(
+                        let call_token = self.secure_ctx.encode_call_token(
                             CallToken {
                                 direction: CallDirection::Outgoing,
                                 call_id: call_id.clone(),
