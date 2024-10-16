@@ -1,11 +1,11 @@
 use std::{io, net::SocketAddr, sync::Arc};
 
 use crate::{
-    call_manager::EmitterId,
-    protocol::{CallActionRequest, CallActionResponse, CallApiError, CreateCallRequest, CreateCallResponse, InternalCallId},
+    protocol::{CallApiError, CreateCallRequest, CreateCallResponse},
     secure::SecureContext,
     sip::MediaApi,
 };
+use atm0s_small_p2p::pubsub_service::PubsubServiceRequester;
 use poem::{get, listener::TcpListener, middleware::Tracing, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
 use tokio::sync::{
@@ -17,19 +17,12 @@ mod api_call;
 mod api_token;
 mod header_secret;
 mod response_result;
-mod ws_call;
-mod ws_notify;
-
-use ws_call::WebsocketCallCtx;
-pub use ws_call::WebsocketCallEventEmitter;
-use ws_notify::WebsocketNotifyCtx;
+mod ws_in_call;
+mod ws_in_notify;
+mod ws_out_call;
 
 pub enum HttpCommand {
     CreateCall(CreateCallRequest, MediaApi, oneshot::Sender<Result<CreateCallResponse, CallApiError>>),
-    ActionCall(InternalCallId, CallActionRequest, oneshot::Sender<anyhow::Result<CallActionResponse>>),
-    EndCall(InternalCallId, oneshot::Sender<Result<(), CallApiError>>),
-    SubscribeCall(InternalCallId, WebsocketCallEventEmitter, oneshot::Sender<Result<(), CallApiError>>),
-    UnsubscribeCall(InternalCallId, EmitterId, oneshot::Sender<Result<(), CallApiError>>),
 }
 
 pub struct HttpServer {
@@ -37,10 +30,12 @@ pub struct HttpServer {
     media_gateway: String,
     secure_ctx: Arc<SecureContext>,
     tx: Sender<HttpCommand>,
+    call_pubsub: PubsubServiceRequester,
+    notify_pubsub: PubsubServiceRequester,
 }
 
 impl HttpServer {
-    pub fn new(addr: SocketAddr, media_gateway: &str, secure_ctx: Arc<SecureContext>) -> (Self, Receiver<HttpCommand>) {
+    pub fn new(addr: SocketAddr, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester, notify_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
         let (tx, rx) = channel(10);
         (
             Self {
@@ -48,6 +43,8 @@ impl HttpServer {
                 media_gateway: media_gateway.to_owned(),
                 tx,
                 secure_ctx,
+                call_pubsub,
+                notify_pubsub,
             },
             rx,
         )
@@ -58,6 +55,7 @@ impl HttpServer {
             media_gateway: self.media_gateway.clone(),
             tx: self.tx.clone(),
             secure_ctx: self.secure_ctx.clone(),
+            call_pubsub: self.call_pubsub.clone(),
         };
         let call_service: OpenApiService<_, ()> = OpenApiService::new(call_api, "Console call APIs", env!("CARGO_PKG_VERSION")).server("/").url_prefix("/call");
         let call_ui = call_service.swagger_ui();
@@ -76,13 +74,26 @@ impl HttpServer {
             .nest("/docs/token/", token_ui)
             .at("/docs/token/spec", poem::endpoint::make_sync(move |_| token_spec.clone()))
             .at(
-                "/ws/call/:call_id",
-                get(ws_call::ws_single_call).data(WebsocketCallCtx {
-                    cmd_tx: self.tx.clone(),
+                "/call/outgoing/:call_id",
+                get(ws_out_call::ws_single_call).data(ws_out_call::WebsocketCallCtx {
                     secure_ctx: self.secure_ctx.clone(),
+                    call_pubsub: self.call_pubsub.clone(),
                 }),
             )
-            .at("/ws/notify", get(ws_notify::ws_single_notify).data(WebsocketNotifyCtx { secure_ctx: self.secure_ctx.clone() }))
+            .at(
+                "/call/incoming/:call_id",
+                get(ws_in_call::ws_single_call).data(ws_in_call::WebsocketCallCtx {
+                    secure_ctx: self.secure_ctx.clone(),
+                    call_pubsub: self.call_pubsub.clone(),
+                }),
+            )
+            .at(
+                "/notify",
+                get(ws_in_notify::ws_single_notify).data(ws_in_notify::WebsocketNotifyCtx {
+                    secure_ctx: self.secure_ctx.clone(),
+                    notify_pubsub: self.notify_pubsub.clone(),
+                }),
+            )
             .with(Tracing::default());
 
         Server::new(TcpListener::bind(self.addr)).run(app).await

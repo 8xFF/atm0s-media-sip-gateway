@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package sip_gateway;
+
+message IncomingCallData {
+    message IncomingCallEvent {
+        message SipEvent {
+            message Cancelled {
+
+            }
+
+            message Bye {
+
+            }
+
+            oneof event {
+                Cancelled cancelled = 1;
+                Bye bye = 2;
+            }
+        }
+
+        message Accepted {
+
+        }
+
+        message Ended {
+
+        }
+
+        message Error {
+            string message = 1;
+        }
+
+        oneof event {
+            Error err = 1;
+            SipEvent sip = 2;
+            Accepted accepted = 3;
+            Ended ended = 4;
+        }
+    }
+
+    message IncomingCallRequest {
+        message Ring {
+
+        }
+
+        message Accept {
+            string room = 1;
+            string peer = 2;
+            bool record = 3;
+        }
+
+        message End {
+
+        }
+
+        uint32 req_id = 1;
+        oneof action {
+            Ring ring = 10;
+            Accept accept = 11;
+            End end = 12;
+        }
+    }
+
+    message IncomingCallResponse {
+        message Ring {
+
+        }
+
+        message Accept {
+
+        }
+
+        message End {
+
+        }
+
+        message Error {
+            string message = 1;
+        }
+
+        uint32 req_id = 1;
+        oneof response {
+            Error error = 10;
+            Ring ring = 11;
+            Accept accept = 12;
+            End end = 13;
+        }
+    }
+
+    oneof data {
+        IncomingCallEvent event = 1;
+        IncomingCallRequest request = 2;
+        IncomingCallResponse response = 3;
+    }
+}
+
+
+message OutgoingCallData {
+    message OutgoingCallEvent {
+        message SipEvent {
+            message Provisional { 
+                uint32 code = 1;
+            }
+
+            message Early {
+                uint32 code = 1;
+            }
+
+            message Accepted { 
+                uint32 code = 1;
+            }
+
+            message Failure { 
+                uint32 code = 1;
+            }
+
+            message Bye {
+
+            }
+
+            oneof event {
+                Provisional provisional = 1;
+                Early early = 2;
+                Accepted accepted = 3;
+                Failure failure = 4;
+                Bye bye = 5;
+            }
+        }
+
+        message Ended {
+
+        }
+
+        message Error {
+            string message = 1;
+        }
+
+        oneof event {
+            Error err = 1;
+            SipEvent sip = 2;
+            Ended ended = 3;
+        }
+    }
+    
+    message OutgoingCallRequest {
+        message End {
+
+        }
+
+        uint32 req_id = 1;
+        oneof action {
+            End end = 10;
+        }
+    }
+
+    message OutgoingCallResponse {
+        message End {
+
+        }
+
+        message Error {
+            string message = 1;
+        }
+
+        uint32 req_id = 1;
+        oneof response {
+            Error error = 10;
+            End end = 11;
+        }
+    }
+
+    oneof data {
+        OutgoingCallEvent event = 1;
+        OutgoingCallRequest request = 2;
+        OutgoingCallResponse response = 3;
+    }
+}

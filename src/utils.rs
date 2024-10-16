@@ -26,7 +26,3 @@ impl<T1, T2, T3> From<select2::OrOutput<T1, T2>> for select3::OrOutput<T1, T2, T
         }
     }
 }
-
-pub fn http_to_ws(url: &str) -> String {
-    url.replace("http://", "ws://").replace("https://", "wss://")
-}

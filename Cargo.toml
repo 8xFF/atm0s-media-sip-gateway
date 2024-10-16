@@ -37,3 +37,13 @@ jwt-simple = { version = "0.12", default-features = false, features = [
     "pure-rust",
 ] }
 anyhow = "1.0"
+atm0s-small-p2p = { git = "https://github.com/8xFF/atm0s-small-p2p.git", rev = "2896a1f0d78e597105a2aa0d256a2a31dbf4809f" }
+rustls = "0.23"
+prost = "0.13"
+
+[build-dependencies]
+prost-build = "0.13"
+
+[features]
+default = []
+build-protobuf = []

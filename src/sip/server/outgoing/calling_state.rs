@@ -3,8 +3,8 @@ use ezk_sip_types::header::typed::ContentType;
 use ezk_sip_ua::invite::{create_ack, initiator::Response};
 
 use crate::{
-    protocol::{OutgoingCallEvent, OutgoingCallSipEvent},
-    sip::server::outgoing::{early_state::EarlyState, talking_state::TalkingState, State},
+    protocol::protobuf::sip_gateway::outgoing_call_data::outgoing_call_event::sip_event,
+    sip::server::outgoing::{build_sip_event, early_state::EarlyState, talking_state::TalkingState, State},
 };
 
 use super::{Ctx, SipOutgoingCallError, StateLogic, StateOut};
@@ -46,7 +46,7 @@ impl StateLogic for CallingState {
             Response::Provisional(response) => {
                 let code = response.line.code.into_u16();
                 log::info!("[CallingState] on Provisional {code}");
-                Ok(Some(StateOut::Event(OutgoingCallEvent::Sip(OutgoingCallSipEvent::Provisional { code }))))
+                Ok(Some(StateOut::Event(build_sip_event(sip_event::Event::Provisional(sip_event::Provisional { code: code as u32 })))))
             }
             Response::Failure(response) => {
                 // we dont exit here, after that Finished will be called
@@ -54,7 +54,7 @@ impl StateLogic for CallingState {
 
                 log::info!("[CallingState] on Failure {code}");
                 if code != 401 || self.auth_failed {
-                    return Ok(Some(StateOut::Event(OutgoingCallEvent::Sip(OutgoingCallSipEvent::Failure { code }))));
+                    return Ok(Some(StateOut::Event(build_sip_event(sip_event::Event::Failure(sip_event::Failure { code: code as u32 })))));
                 }
 
                 if let Some(auth) = &mut ctx.auth {
@@ -74,7 +74,7 @@ impl StateLogic for CallingState {
                     self.start(ctx).await?;
                     Ok(Some(StateOut::Continue))
                 } else {
-                    Ok(Some(StateOut::Event(OutgoingCallEvent::Sip(OutgoingCallSipEvent::Failure { code }))))
+                    Ok(Some(StateOut::Event(build_sip_event(sip_event::Event::Failure(sip_event::Failure { code: code as u32 })))))
                 }
             }
             Response::Early(early, response, _rseq) => {
@@ -82,7 +82,7 @@ impl StateLogic for CallingState {
                 log::info!("[CallingState] switch early with code: {code}");
                 Ok(Some(StateOut::Switch(
                     State::Early(EarlyState::new(early)),
-                    OutgoingCallEvent::Sip(OutgoingCallSipEvent::Early { code }),
+                    build_sip_event(sip_event::Event::Early(sip_event::Early { code: code as u32 })),
                 )))
             }
             Response::Session(session, response) => {
@@ -98,7 +98,7 @@ impl StateLogic for CallingState {
 
                 Ok(Some(StateOut::Switch(
                     State::Talking(TalkingState::new(session)),
-                    OutgoingCallEvent::Sip(OutgoingCallSipEvent::Accepted { code }),
+                    build_sip_event(sip_event::Event::Accepted(sip_event::Accepted { code: code as u32 })),
                 )))
             }
             Response::Finished => {

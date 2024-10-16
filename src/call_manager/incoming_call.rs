@@ -1,96 +1,53 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use anyhow::anyhow;
-use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    oneshot,
-};
+use atm0s_small_p2p::pubsub_service::{PublisherEventOb, PubsubServiceRequester};
+use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    error::PrintErrorDetails,
+    error::PrintErrorSimple,
     hook::HttpHookSender,
-    protocol::{CallAction, CallActionRequest, CallActionResponse, HookIncomingCallRequest, HookIncomingCallResponse, IncomingCallEvent, InternalCallId},
+    protocol::{
+        protobuf::sip_gateway::incoming_call_data::{incoming_call_event, incoming_call_request, incoming_call_response, IncomingCallEvent},
+        HookIncomingCallRequest, HookIncomingCallResponse, IncomingCallAction, InternalCallId, StreamingInfo,
+    },
     sip::{MediaApi, SipIncomingCall, SipIncomingCallOut},
-    utils::http_to_ws,
     utils::select2,
 };
 
-use super::{EmitterId, EventEmitter};
+pub struct IncomingCall {}
 
-pub struct IncomingCall<EM> {
-    control_tx: UnboundedSender<CallControl<EM>>,
-}
-
-impl<EM: EventEmitter> IncomingCall<EM> {
-    pub fn new(http_public: &str, api: MediaApi, sip: SipIncomingCall, call_token: String, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender) -> Self {
-        let (control_tx, control_rx) = unbounded_channel();
-        let http_public = http_public.to_owned();
+impl IncomingCall {
+    pub fn new(api: MediaApi, sip: SipIncomingCall, call_token: String, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender, call_pubsub: PubsubServiceRequester) -> Self {
         tokio::spawn(async move {
             let call_id = sip.call_id();
-            if let Err(e) = run_call_loop(&http_public, api, sip, call_token, control_rx, hook).await {
+            if let Err(e) = run_call_loop(api, sip, call_token, hook, call_pubsub).await {
                 log::error!("[IncomingCall] call {call_id} error {e:?}");
             }
             destroy_tx.send(call_id).expect("should send destroy request to main loop");
         });
 
-        Self { control_tx }
-    }
-
-    pub fn add_emitter(&mut self, emitter: EM) {
-        if let Err(e) = self.control_tx.send(CallControl::Sub(emitter)) {
-            log::error!("[IncomingCall] send Sub control error {e:?}");
-        }
-    }
-
-    pub fn del_emitter(&mut self, emitter: EmitterId) {
-        if let Err(e) = self.control_tx.send(CallControl::Unsub(emitter)) {
-            log::error!("[IncomingCall] send Unsub control error {e:?}");
-        }
-    }
-
-    pub fn do_action(&mut self, action: CallActionRequest, tx: oneshot::Sender<anyhow::Result<CallActionResponse>>) {
-        if let Err(e) = self.control_tx.send(CallControl::Action(action, tx)) {
-            log::error!("[IncomingCall] send Unsub control error {e:?}");
-        }
-    }
-
-    pub fn end(&mut self) {
-        if let Err(e) = self.control_tx.send(CallControl::End) {
-            log::error!("[IncomingCall] send End control error {e:?}");
-        }
+        Self {}
     }
 }
 
-enum CallControl<EM> {
-    Sub(EM),
-    Unsub(EmitterId),
-    Action(CallActionRequest, oneshot::Sender<anyhow::Result<CallActionResponse>>),
-    End,
-}
-
-async fn run_call_loop<EM: EventEmitter>(
-    http_public: &str,
-    api: MediaApi,
-    mut call: SipIncomingCall,
-    call_token: String,
-    mut control_rx: UnboundedReceiver<CallControl<EM>>,
-    hook: HttpHookSender,
-) -> anyhow::Result<()> {
+async fn run_call_loop(api: MediaApi, mut call: SipIncomingCall, call_token: String, hook: HttpHookSender, call_pubsub: PubsubServiceRequester) -> anyhow::Result<()> {
     let call_id = call.call_id();
     let from = call.from().to_owned();
     let to = call.to().to_owned();
 
-    let mut emitters: HashMap<EmitterId, EM> = HashMap::new();
-    let call_ws = format!("{}/ws/call/{call_id}?token={call_token}", http_to_ws(http_public));
+    let channel_id = call_id.to_pubsub_channel();
+    let mut subscribers = HashSet::new();
+    let call_ws = format!("/call/incoming/{call_id}?token={call_token}");
     log::info!("[IncomingCall] call {call_id} start, ws: {call_ws}, sending hook ...");
 
     // we send trying first
     call.send_trying().await?;
+    let mut publisher = call_pubsub.publisher(channel_id).await;
 
     // feedback hook for info
     let res: HookIncomingCallResponse = hook
         .request(&HookIncomingCallRequest {
-            gateway: http_public.to_owned(),
             call_id: call_id.clone(),
             call_token,
             call_ws,
@@ -102,29 +59,25 @@ async fn run_call_loop<EM: EventEmitter>(
     log::info!("[IncomingCall] call {call_id} got hook action {:?}", res.action);
 
     match res.action {
-        CallAction::Trying => {}
-        CallAction::Ring => call.send_ringing().await?,
-        CallAction::Reject => {
-            call.kill_because_validate_failed();
-            return Ok(());
-        }
-        CallAction::Accept => {
+        IncomingCallAction::Ring => call.send_ringing().await?,
+        IncomingCallAction::Accept => {
             let stream = res.stream.ok_or(anyhow!("missing stream in accept action"))?;
             call.accept(api.clone(), stream).await?;
+        }
+        IncomingCallAction::End => {
+            call.end().await.print_error("[IncomingCall] end call from hook response");
+            return Ok(());
         }
     };
 
     log::info!("[IncomingCall] call {call_id} started loop");
 
     loop {
-        let out = select2::or(call.recv(), control_rx.recv()).await;
+        let out = select2::or(call.recv(), publisher.recv_ob::<incoming_call_request::Action>()).await;
         match out {
             select2::OrOutput::Left(Ok(Some(out))) => match out {
                 SipIncomingCallOut::Event(event) => {
-                    let value = serde_json::to_value(&event).expect("should convert to json");
-                    for emitter in emitters.values_mut() {
-                        emitter.fire(value.clone().into());
-                    }
+                    publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
                     hook.send(&event);
                 }
                 SipIncomingCallOut::Continue => {}
@@ -135,64 +88,73 @@ async fn run_call_loop<EM: EventEmitter>(
             }
             select2::OrOutput::Left(Err(e)) => {
                 log::error!("[IncomingCall] call {call_id} error {e:?}");
-                let event = IncomingCallEvent::Error { message: e.to_string() };
-                let value = serde_json::to_value(&event).expect("should convert to json");
-                for emitter in emitters.values_mut() {
-                    emitter.fire(value.clone().into());
-                }
+                let event = IncomingCallEvent {
+                    event: Some(incoming_call_event::Event::Err(incoming_call_event::Error { message: e.to_string() })),
+                };
+                publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
                 hook.send(&event);
                 break;
             }
-            select2::OrOutput::Right(Some(control)) => match control {
-                CallControl::Sub(emitter) => {
-                    emitters.insert(emitter.emitter_id(), emitter);
+            select2::OrOutput::Right(Ok(control)) => match control {
+                PublisherEventOb::PeerJoined(peer_src) => {
+                    subscribers.insert(peer_src);
                 }
-                CallControl::Unsub(emitter_id) => {
-                    if emitters.remove(&emitter_id).is_some() {
-                        if emitters.is_empty() {
-                            log::info!("[IncomingCall] call {call_id} all subs disconnected => end call");
+                PublisherEventOb::PeerLeaved(peer_src) => {
+                    if subscribers.remove(&peer_src) && subscribers.is_empty() {
+                        log::info!("[IncomingCall] call {call_id} all subs disconnected => end call");
+                        if let Err(e) = call.end().await {
+                            log::error!("[IncomingCall] call {call_id} end error {e:?}");
+                        }
+                        break;
+                    }
+                }
+                PublisherEventOb::GuestFeedbackRpc(action, rpc_id, method, peer_src) => {
+                    log::info!("[IncomingCall] on rpc {method} from {peer_src:?} with payload: {action:?}");
+                    let res = match action {
+                        incoming_call_request::Action::Ring(_ring) => {
+                            if let Err(e) = call.send_trying().await {
+                                incoming_call_response::Response::Error(incoming_call_response::Error { message: e.to_string() })
+                            } else {
+                                incoming_call_response::Response::Ring(Default::default())
+                            }
+                        }
+                        incoming_call_request::Action::Accept(accept) => {
+                            let stream = StreamingInfo {
+                                room: accept.room,
+                                peer: accept.peer,
+                                record: accept.record,
+                            };
+                            if let Err(e) = call.accept(api.clone(), stream).await {
+                                incoming_call_response::Response::Error(incoming_call_response::Error { message: e.to_string() })
+                            } else {
+                                incoming_call_response::Response::Accept(Default::default())
+                            }
+                        }
+                        incoming_call_request::Action::End(_end) => {
+                            log::info!("[IncomingCall] call {call_id} received end request");
                             if let Err(e) = call.end().await {
                                 log::error!("[IncomingCall] call {call_id} end error {e:?}");
-                            }
-                            break;
-                        }
-                    }
-                }
-                CallControl::End => {
-                    log::info!("[IncomingCall] call {call_id} received end request");
-                    if let Err(e) = call.end().await {
-                        log::error!("[IncomingCall] call {call_id} end error {e:?}");
-                    }
-                    break;
-                }
-                CallControl::Action(action, tx) => {
-                    let res = match action.action {
-                        CallAction::Trying => call.send_trying().await.map_err(|e| e.into()),
-                        CallAction::Ring => call.send_ringing().await.map_err(|e| e.into()),
-                        CallAction::Reject => call.end().await.map_err(|e| e.into()),
-                        CallAction::Accept => {
-                            if let Some(stream) = action.stream {
-                                call.accept(api.clone(), stream).await.map_err(|e| e.into())
+                                incoming_call_response::Response::Error(incoming_call_response::Error { message: e.to_string() })
                             } else {
-                                Err(anyhow!("missing stream in accept action"))
+                                incoming_call_response::Response::End(Default::default())
                             }
                         }
                     };
-                    tx.send(res.map(|_| CallActionResponse {})).print_error_detail("[IncomingCall] send action res");
+                    publisher.requester().answer_feedback_rpc_ob(rpc_id, peer_src, &res).await.print_error("[IncomingCall] answer rpc");
                 }
+                _ => {}
             },
-            select2::OrOutput::Right(None) => {
+            select2::OrOutput::Right(Err(_e)) => {
                 break;
             }
         }
     }
 
     log::info!("[IncomingCall] call {call_id} destroyed");
-    let event = IncomingCallEvent::Destroyed;
-    let value = serde_json::to_value(&event).expect("should convert to json");
-    for emitter in emitters.values_mut() {
-        emitter.fire(value.clone().into());
-    }
+    let event = IncomingCallEvent {
+        event: Some(incoming_call_event::Event::Ended(Default::default())),
+    };
+    publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
     hook.send(&event);
     Ok(())
 }

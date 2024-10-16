@@ -1,7 +1,13 @@
 use ezk_sip_ua::invite::session::Session;
 
 use crate::{
-    protocol::{IncomingCallEvent, IncomingCallSipEvent, StreamingInfo},
+    protocol::{
+        protobuf::sip_gateway::incoming_call_data::{
+            incoming_call_event::{self, sip_event},
+            IncomingCallEvent,
+        },
+        StreamingInfo,
+    },
     sip::{media::MediaRtpEngineAnswer, MediaApi},
 };
 
@@ -47,7 +53,11 @@ impl StateLogic for TalkingState {
             ezk_sip_ua::invite::session::Event::ReInviteReceived(_re_invite_received) => Ok(Some(StateOut::Continue)),
             ezk_sip_ua::invite::session::Event::Bye(_) => {
                 log::info!("[TalkingState] on Bye");
-                Ok(Some(StateOut::Event(IncomingCallEvent::Sip(IncomingCallSipEvent::Bye))))
+                Ok(Some(StateOut::Event(IncomingCallEvent {
+                    event: Some(incoming_call_event::Event::Sip(incoming_call_event::SipEvent {
+                        event: Some(sip_event::Event::Bye(sip_event::Bye {})),
+                    })),
+                })))
             }
             ezk_sip_ua::invite::session::Event::Terminated => {
                 log::info!("[TalkingState] on Terminated");
