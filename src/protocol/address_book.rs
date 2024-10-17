@@ -14,6 +14,7 @@ pub struct AppInfo {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type")]
 pub enum PhoneNumberRoute {
     Static { client: String },
     Dynamic { hook: String },

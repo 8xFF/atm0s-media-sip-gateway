@@ -75,12 +75,3 @@ pub fn is_sip_incoming_cancelled(event: &Option<incoming_call_event::Event>) -> 
         incoming_call_event::Event::Ended(..) => None,
     }
 }
-
-pub fn is_sip_incoming_accepted(event: &Option<incoming_call_event::Event>) -> Option<()> {
-    match event.as_ref()? {
-        incoming_call_event::Event::Err(..) => None,
-        incoming_call_event::Event::Sip(..) => None,
-        incoming_call_event::Event::Accepted(..) => Some(()),
-        incoming_call_event::Event::Ended(..) => None,
-    }
-}

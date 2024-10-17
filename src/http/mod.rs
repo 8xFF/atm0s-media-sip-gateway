@@ -88,7 +88,7 @@ impl HttpServer {
                 }),
             )
             .at(
-                "/notify",
+                "/call/incoming/notify",
                 get(ws_in_notify::ws_single_notify).data(ws_in_notify::WebsocketNotifyCtx {
                     secure_ctx: self.secure_ctx.clone(),
                     notify_pubsub: self.notify_pubsub.clone(),

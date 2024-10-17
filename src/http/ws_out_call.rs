@@ -95,13 +95,18 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                         match OutgoingCallData::decode(msg.as_slice()) {
                             Ok(data) => match data.data {
                                 Some(outgoing_call_data::Data::Request(req)) => {
-                                    log::error!("[WsCall {call_id}] on incoming req {} {:?}", req.req_id, req.action);
+                                    log::info!("[WsCall {call_id}] on incoming req {} {:?}", req.req_id, req.action);
                                     let subscriber = subscriber.requester().clone();
                                     let call_id = call_id.clone();
                                     let out_tx = out_tx.clone();
                                     tokio::spawn(async move {
+                                        let action = if let Some(action) = req.action {
+                                            action
+                                        } else {
+                                            return;
+                                        };
                                         let res = subscriber
-                                            .feedback_rpc_ob::<_, outgoing_call_response::Response>("action", &req.action, Duration::from_secs(RPC_TIMEOUT_SECONDS))
+                                            .feedback_rpc_ob::<_, outgoing_call_response::Response>("action", &action, Duration::from_secs(RPC_TIMEOUT_SECONDS))
                                             .await
                                             .map_err(|e| e.to_string());
 

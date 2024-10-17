@@ -8,7 +8,7 @@ use crate::{
     error::PrintErrorSimple,
     hook::HttpHookSender,
     protocol::{
-        is_sip_incoming_accepted, is_sip_incoming_cancelled,
+        is_sip_incoming_cancelled,
         protobuf::sip_gateway::incoming_call_data::{incoming_call_event, incoming_call_request, incoming_call_response, IncomingCallEvent},
         HookIncomingCallRequest, IncomingCallAction, InternalCallId, StreamingInfo,
     },
@@ -90,6 +90,8 @@ async fn run_call_loop(
                 return Ok(());
             }
         };
+    } else {
+        call.send_ringing().await?;
     }
 
     log::info!("[IncomingCall] call {call_id} started loop");
@@ -100,9 +102,7 @@ async fn run_call_loop(
             select2::OrOutput::Left(Ok(Some(out))) => match out {
                 SipIncomingCallOut::Event(event) => {
                     if is_sip_incoming_cancelled(&event.event).is_some() {
-                        notify_sender.cancel(call_id.clone()).await;
-                    } else if is_sip_incoming_accepted(&event.event).is_some() {
-                        notify_sender.accept(call_id.clone()).await;
+                        notify_sender.cancel(call_id.clone()).await.print_error("[IncomingCall] send cancel notify");
                     }
                     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
                     hook.send(&event);
@@ -135,7 +135,7 @@ async fn run_call_loop(
                         break;
                     }
                 }
-                PublisherEventOb::GuestFeedbackRpc(action, rpc_id, method, peer_src) => {
+                PublisherEventOb::FeedbackRpc(action, rpc_id, method, peer_src) | PublisherEventOb::GuestFeedbackRpc(action, rpc_id, method, peer_src) => {
                     log::info!("[IncomingCall] on rpc {method} from {peer_src:?} with payload: {action:?}");
                     let res = match action {
                         incoming_call_request::Action::Ring(_ring) => {
@@ -146,15 +146,27 @@ async fn run_call_loop(
                             }
                         }
                         incoming_call_request::Action::Accept(accept) => {
+                            log::info!("[IncomingCall] call {call_id} received accept request");
                             let stream = StreamingInfo {
                                 room: accept.room,
                                 peer: accept.peer,
                                 record: accept.record,
                             };
                             if let Err(e) = call.accept(api.clone(), stream).await {
+                                log::error!("[IncomingCall] call {call_id} accept error {e:?}");
                                 incoming_call_response::Response::Error(incoming_call_response::Error { message: e.to_string() })
                             } else {
+                                notify_sender.accept(call_id.clone()).await.print_error("[IncomingCall] send accept notify");
                                 incoming_call_response::Response::Accept(Default::default())
+                            }
+                        }
+                        incoming_call_request::Action::Accept2(_accept2) => {
+                            let room: String = call.call_id().into();
+                            let peer: String = "callee".to_owned();
+                            //TODO how to config that?
+                            match api.create_webrtc_token(&room, &peer, false).await {
+                                Ok(token) => incoming_call_response::Response::Accept2(incoming_call_response::Accept2 { room, peer, token }),
+                                Err(e) => incoming_call_response::Response::Error(incoming_call_response::Error { message: e.to_string() }),
                             }
                         }
                         incoming_call_request::Action::End(_end) => {
@@ -169,7 +181,9 @@ async fn run_call_loop(
                     };
                     publisher.requester().answer_feedback_rpc_ob(rpc_id, peer_src, &res).await.print_error("[IncomingCall] answer rpc");
                 }
-                _ => {}
+                _ => {
+                    log::warn!("IncomingCall] invalid pubsub event {control:?}");
+                }
             },
             select2::OrOutput::Right(Err(_e)) => {
                 break;

@@ -74,6 +74,10 @@ message IncomingCallData {
             bool record = 3;
         }
 
+        message Accept2 {
+
+        }
+
         message End {
 
         }
@@ -82,7 +86,8 @@ message IncomingCallData {
         oneof action {
             Ring ring = 10;
             Accept accept = 11;
-            End end = 12;
+            Accept2 accept2 = 12;
+            End end = 13;
         }
     }
 
@@ -93,6 +98,12 @@ message IncomingCallData {
 
         message Accept {
 
+        }
+
+        message Accept2 {
+            string room = 1;
+            string peer = 2;
+            string token = 3;
         }
 
         message End {
@@ -108,7 +119,8 @@ message IncomingCallData {
             Error error = 10;
             Ring ring = 11;
             Accept accept = 12;
-            End end = 13;
+            Accept2 accept2 = 13;
+            End end = 14;
         }
     }
 

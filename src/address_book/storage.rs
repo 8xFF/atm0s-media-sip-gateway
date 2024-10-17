@@ -91,7 +91,7 @@ impl AddressBookStorageInternal {
             self.numbers.insert(number.number.clone(), number);
         }
         if self.numbers.len() != pre_len {
-            log::info!("[AddressBookStorage] numbers len changed from {} to {}", pre_len, self.numbers.len());
+            log::info!("[AddressBookStorage] numbers len changed from {} to {:?}", pre_len, self.numbers);
         }
     }
 }

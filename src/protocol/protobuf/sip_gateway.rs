@@ -107,7 +107,7 @@ pub mod incoming_call_data {
     pub struct IncomingCallRequest {
         #[prost(uint32, tag = "1")]
         pub req_id: u32,
-        #[prost(oneof = "incoming_call_request::Action", tags = "10, 11, 12")]
+        #[prost(oneof = "incoming_call_request::Action", tags = "10, 11, 12, 13")]
         pub action: ::core::option::Option<incoming_call_request::Action>,
     }
     /// Nested message and enum types in `IncomingCallRequest`.
@@ -127,6 +127,9 @@ pub mod incoming_call_data {
         }
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Accept2 {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct End {}
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -136,6 +139,8 @@ pub mod incoming_call_data {
             #[prost(message, tag = "11")]
             Accept(Accept),
             #[prost(message, tag = "12")]
+            Accept2(Accept2),
+            #[prost(message, tag = "13")]
             End(End),
         }
     }
@@ -144,7 +149,7 @@ pub mod incoming_call_data {
     pub struct IncomingCallResponse {
         #[prost(uint32, tag = "1")]
         pub req_id: u32,
-        #[prost(oneof = "incoming_call_response::Response", tags = "10, 11, 12, 13")]
+        #[prost(oneof = "incoming_call_response::Response", tags = "10, 11, 12, 13, 14")]
         pub response: ::core::option::Option<incoming_call_response::Response>,
     }
     /// Nested message and enum types in `IncomingCallResponse`.
@@ -155,6 +160,16 @@ pub mod incoming_call_data {
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct Accept {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, PartialEq, ::prost::Message)]
+        pub struct Accept2 {
+            #[prost(string, tag = "1")]
+            pub room: ::prost::alloc::string::String,
+            #[prost(string, tag = "2")]
+            pub peer: ::prost::alloc::string::String,
+            #[prost(string, tag = "3")]
+            pub token: ::prost::alloc::string::String,
+        }
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct End {}
@@ -174,6 +189,8 @@ pub mod incoming_call_data {
             #[prost(message, tag = "12")]
             Accept(Accept),
             #[prost(message, tag = "13")]
+            Accept2(Accept2),
+            #[prost(message, tag = "14")]
             End(End),
         }
     }

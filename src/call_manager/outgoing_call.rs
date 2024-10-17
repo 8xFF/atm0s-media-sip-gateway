@@ -75,7 +75,7 @@ async fn run_call_loop(mut call: SipOutgoingCall, destroy_tx: UnboundedSender<In
                         }
                     }
                 }
-                PublisherEventOb::GuestFeedbackRpc(action, rpc_id, _method, peer_src) => match action {
+                PublisherEventOb::FeedbackRpc(action, rpc_id, _method, peer_src) | PublisherEventOb::GuestFeedbackRpc(action, rpc_id, _method, peer_src) => match action {
                     outgoing_call_request::Action::End(_end) => {
                         log::info!("[OutgoingCall] call {call_id} received end request");
                         let res = if let Err(e) = call.end().await {

@@ -4,7 +4,7 @@ use crate::{
     hook::HttpHookSenderNoContext,
     protocol::{
         protobuf::sip_gateway::{incoming_call_notify, IncomingCallNotify},
-        HookIncomingCallRequest, IncomingCallActionRequest, InternalCallId, NotifyIdentify, PhoneNumber, PhoneNumberRoute,
+        HookIncomingCallRequest, HookIncomingCallResponse, InternalCallId, NotifyIdentify, PhoneNumber, PhoneNumberRoute,
     },
 };
 
@@ -21,10 +21,14 @@ impl IncomingCallNotifySender {
         }
     }
 
-    pub async fn notify(&mut self, req: HookIncomingCallRequest) -> anyhow::Result<Option<IncomingCallActionRequest>> {
+    pub async fn notify(&mut self, req: HookIncomingCallRequest) -> anyhow::Result<Option<HookIncomingCallResponse>> {
         match self {
-            Self::Http(sender, endpoint) => Ok(Some(sender.request(&endpoint, &req).await?)),
+            Self::Http(sender, endpoint) => {
+                log::info!("[IncomingCallNotifySender] call {} send over http", req.call_id);
+                Ok(Some(sender.request(&endpoint, &req).await?))
+            }
             Self::Websocket(pubsub, channel) => {
+                log::info!("[IncomingCallNotifySender] call {} send over websocket", req.call_id);
                 pubsub
                     .publish_as_guest_ob(
                         *channel,
