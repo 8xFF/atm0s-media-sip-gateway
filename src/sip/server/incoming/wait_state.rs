@@ -11,9 +11,15 @@ use tokio::sync::{
 
 use crate::{
     error::PrintErrorSimple,
-    futures::select2,
-    protocol::{IncomingCallEvent, IncomingCallSipEvent, StreamingInfo},
+    protocol::{
+        protobuf::sip_gateway::incoming_call_data::{
+            incoming_call_event::{self, sip_event},
+            IncomingCallEvent,
+        },
+        StreamingInfo,
+    },
     sip::{media::MediaRtpEngineAnswer, MediaApi},
+    utils::select2,
 };
 
 use super::{talking_state::TalkingState, Ctx, SipIncomingCallError, State, StateLogic, StateOut};
@@ -65,8 +71,11 @@ impl StateLogic for WaitState {
         response.msg.headers.insert_named(&ContentType(BytesStr::from_static("application/sdp")));
 
         let (session, _) = self.acceptor.take().expect("should have acceptor").respond_success(response).await?;
+        let event = IncomingCallEvent {
+            event: Some(incoming_call_event::Event::Accepted(incoming_call_event::Accepted {})),
+        };
         self.tx
-            .send(Some(StateOut::Switch(State::Talking(TalkingState::new(session, rtp)), IncomingCallEvent::Accepted)))
+            .send(Some(StateOut::Switch(State::Talking(TalkingState::new(session, rtp)), event)))
             .expect("should send to parent");
         Ok(())
     }
@@ -95,7 +104,12 @@ impl StateLogic for WaitState {
                 select2::OrOutput::Left(event) => return Ok(event.expect("")),
                 select2::OrOutput::Right(_) => {
                     self.tx.send(None).expect("should send to parent");
-                    return Ok(Some(StateOut::Event(IncomingCallEvent::Sip(IncomingCallSipEvent::Cancelled))));
+                    let event = IncomingCallEvent {
+                        event: Some(incoming_call_event::Event::Sip(incoming_call_event::SipEvent {
+                            event: Some(sip_event::Event::Cancelled(sip_event::Cancelled {})),
+                        })),
+                    };
+                    return Ok(Some(StateOut::Event(event)));
                 }
             }
         }

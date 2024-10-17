@@ -15,7 +15,7 @@ use crate::protocol::{SipAuth, StreamingInfo};
 mod incoming;
 mod outgoing;
 
-pub use incoming::{SipIncomingCall, SipIncomingCallError, SipIncomingCallOut};
+pub use incoming::{SipIncomingCall, SipIncomingCallOut};
 pub use outgoing::{SipOutgoingCall, SipOutgoingCallError, SipOutgoingCallOut};
 
 use super::MediaApi;

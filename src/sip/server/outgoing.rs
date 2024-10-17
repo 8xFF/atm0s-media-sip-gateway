@@ -16,7 +16,13 @@ use talking_state::TalkingState;
 use thiserror::Error;
 
 use crate::{
-    protocol::{InternalCallId, OutgoingCallEvent, SipAuth, StreamingInfo},
+    protocol::{
+        protobuf::sip_gateway::outgoing_call_data::{
+            outgoing_call_event::{self, sip_event},
+            OutgoingCallEvent,
+        },
+        InternalCallId, SipAuth, StreamingInfo,
+    },
     sip::{MediaApi, MediaEngineError, MediaRtpEngineOffer},
 };
 
@@ -79,12 +85,10 @@ pub enum SipOutgoingCallError {
     EzkCore(#[from] ezk_sip_core::Error),
     #[error("EzkAuthError({0})")]
     EzkAuth(#[from] ezk_sip_auth::Error),
-    #[error("SipError({0})")]
-    Sip(u16),
-    #[error("InternalChannel")]
-    InternalChannel,
     #[error("RtpEngine{0}")]
     RtpEngine(#[from] MediaEngineError),
+    #[error("ParseError{0}")]
+    Parse(String),
 }
 
 pub enum SipOutgoingCallOut {
@@ -118,8 +122,8 @@ impl SipOutgoingCall {
     ) -> Result<Self, SipOutgoingCallError> {
         let call_id: InternalCallId = InternalCallId::random();
         log::info!("[SipOutgoingCall {call_id}] create with {from} => {to}");
-        let local_uri = endpoint.parse_uri(from).unwrap();
-        let target = endpoint.parse_uri(to).unwrap();
+        let local_uri = endpoint.parse_uri(from).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
+        let target = endpoint.parse_uri(to).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
 
         let initiator = Initiator::new(endpoint, dialog_layer, invite_layer, NameAddr::uri(local_uri.clone()), contact, target);
 
@@ -167,5 +171,11 @@ impl SipOutgoingCall {
             },
             None => Ok(None),
         }
+    }
+}
+
+fn build_sip_event(event: sip_event::Event) -> OutgoingCallEvent {
+    OutgoingCallEvent {
+        event: Some(outgoing_call_event::Event::Sip(outgoing_call_event::SipEvent { event: Some(event) })),
     }
 }

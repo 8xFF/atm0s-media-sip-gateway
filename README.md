@@ -22,15 +22,13 @@ This project is a SIP (Session Initiation Protocol) gateway designed for the atm
 - Cargo (Rust package manager)
 - A compatible media server
 
-### Installation
+### Installation from docker, prebuilt
+
+TODO
+
+### Installation from source
 
 1. Clone the repository:
-
-   ```bash
-   git clone https://github.com/yourusername/atm0s-media-server.git
-   cd atm0s-media-server
-   ```
-
 2. Build the project:
 
    ```bash

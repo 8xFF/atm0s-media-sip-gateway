@@ -20,6 +20,4 @@ pub enum MediaEngineError {
     InvalidLocation,
     #[error("Invalid status code ({0})")]
     InvalidStatus(u16),
-    #[error("Invalid body")]
-    InvalidBody,
 }
