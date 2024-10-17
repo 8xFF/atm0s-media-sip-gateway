@@ -1,7 +1,10 @@
 use jwt_simple::prelude::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::protocol::{CallDirection, InternalCallId};
+use crate::{
+    protocol::{AppId, CallDirection, InternalCallId, NotifyIdentify},
+    AddressBookStorage,
+};
 
 const CALL_ISSUER: &str = "call";
 const NOTIFY_ISSUER: &str = "noti";
@@ -12,42 +15,37 @@ pub struct CallToken {
     pub call_id: InternalCallId,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-pub struct NotifyToken {
-    pub app: String,
-    pub client: String,
-}
-
 pub struct SecureContext {
-    secret: String,
+    address_book: AddressBookStorage,
     key: HS256Key,
 }
 
 impl SecureContext {
-    pub fn new(secret: &str) -> Self {
+    pub fn new(secret: &str, address_book: AddressBookStorage) -> Self {
         Self {
-            secret: secret.to_owned(),
+            address_book,
             key: HS256Key::from_bytes(secret.as_bytes()),
         }
     }
 
-    pub fn check_secret(&self, secret: &str) -> bool {
-        self.secret.eq(secret)
+    pub fn check_secret(&self, secret: &str) -> Option<AppId> {
+        let app = self.address_book.validate_app(secret)?;
+        Some(app.app_id.into())
     }
 
     pub fn encode_call_token(&self, token: CallToken, duration_secs: u64) -> String {
         self.encode_token(token, CALL_ISSUER, duration_secs)
     }
 
-    pub fn encode_notify_token(&self, token: NotifyToken, duration_secs: u64) -> String {
-        self.encode_token(token, NOTIFY_ISSUER, duration_secs)
+    pub fn encode_notify_token(&self, identify: NotifyIdentify, duration_secs: u64) -> String {
+        self.encode_token(identify, NOTIFY_ISSUER, duration_secs)
     }
 
     pub fn decode_call_token(&self, token: &str) -> Option<CallToken> {
         self.decode_token(token, CALL_ISSUER)
     }
 
-    pub fn decode_notify_token(&self, token: &str) -> Option<NotifyToken> {
+    pub fn decode_notify_token(&self, token: &str) -> Option<NotifyIdentify> {
         self.decode_token(token, NOTIFY_ISSUER)
     }
 
@@ -80,7 +78,8 @@ mod tests {
     #[test]
     fn test_token_encoding_decoding() {
         let secret = "my_secret";
-        let context = SecureContext::new(secret);
+        let storage = AddressBookStorage::new(secret);
+        let context = SecureContext::new(secret, storage);
 
         let call_token = CallToken {
             direction: CallDirection::Outgoing,
@@ -90,8 +89,8 @@ mod tests {
         let decoded_token = context.decode_call_token(&encoded_token).unwrap();
         assert_eq!(decoded_token, call_token);
 
-        let notify_token = NotifyToken {
-            app: "app1".to_owned(),
+        let notify_token = NotifyIdentify {
+            app: "app1".to_owned().into(),
             client: "client1".to_owned(),
         };
         let encoded_token = context.encode_notify_token(notify_token.clone(), 100);
@@ -102,7 +101,8 @@ mod tests {
     #[test]
     fn test_token_expiration() {
         let secret = "my_secret";
-        let context = SecureContext::new(secret);
+        let storage = AddressBookStorage::new(secret);
+        let context = SecureContext::new(secret, storage);
 
         let call_token = CallToken {
             direction: CallDirection::Outgoing,
@@ -113,8 +113,8 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for token to expire
         assert_eq!(context.decode_call_token(&encoded_token), None);
 
-        let notify_token = NotifyToken {
-            app: "app1".to_owned(),
+        let notify_token = NotifyIdentify {
+            app: "app1".to_owned().into(),
             client: "client1".to_owned(),
         };
         let encoded_token = context.encode_notify_token(notify_token, 1);

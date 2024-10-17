@@ -8,20 +8,33 @@ use crate::{
     error::PrintErrorSimple,
     hook::HttpHookSender,
     protocol::{
+        is_sip_incoming_accepted, is_sip_incoming_cancelled,
         protobuf::sip_gateway::incoming_call_data::{incoming_call_event, incoming_call_request, incoming_call_response, IncomingCallEvent},
-        HookIncomingCallRequest, HookIncomingCallResponse, IncomingCallAction, InternalCallId, StreamingInfo,
+        HookIncomingCallRequest, IncomingCallAction, InternalCallId, StreamingInfo,
     },
     sip::{MediaApi, SipIncomingCall, SipIncomingCallOut},
     utils::select2,
 };
 
+mod notify;
+
+pub use notify::IncomingCallNotifySender;
+
 pub struct IncomingCall {}
 
 impl IncomingCall {
-    pub fn new(api: MediaApi, sip: SipIncomingCall, call_token: String, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender, call_pubsub: PubsubServiceRequester) -> Self {
+    pub fn new(
+        api: MediaApi,
+        sip: SipIncomingCall,
+        call_token: String,
+        destroy_tx: UnboundedSender<InternalCallId>,
+        hook: HttpHookSender,
+        call_pubsub: PubsubServiceRequester,
+        notify_sender: IncomingCallNotifySender,
+    ) -> Self {
         tokio::spawn(async move {
             let call_id = sip.call_id();
-            if let Err(e) = run_call_loop(api, sip, call_token, hook, call_pubsub).await {
+            if let Err(e) = run_call_loop(api, sip, call_token, hook, call_pubsub, notify_sender).await {
                 log::error!("[IncomingCall] call {call_id} error {e:?}");
             }
             destroy_tx.send(call_id).expect("should send destroy request to main loop");
@@ -31,7 +44,14 @@ impl IncomingCall {
     }
 }
 
-async fn run_call_loop(api: MediaApi, mut call: SipIncomingCall, call_token: String, hook: HttpHookSender, call_pubsub: PubsubServiceRequester) -> anyhow::Result<()> {
+async fn run_call_loop(
+    api: MediaApi,
+    mut call: SipIncomingCall,
+    call_token: String,
+    hook: HttpHookSender,
+    call_pubsub: PubsubServiceRequester,
+    mut notify_sender: IncomingCallNotifySender,
+) -> anyhow::Result<()> {
     let call_id = call.call_id();
     let from = call.from().to_owned();
     let to = call.to().to_owned();
@@ -46,8 +66,8 @@ async fn run_call_loop(api: MediaApi, mut call: SipIncomingCall, call_token: Str
     let mut publisher = call_pubsub.publisher(channel_id).await;
 
     // feedback hook for info
-    let res: HookIncomingCallResponse = hook
-        .request(&HookIncomingCallRequest {
+    let res = notify_sender
+        .notify(HookIncomingCallRequest {
             call_id: call_id.clone(),
             call_token,
             call_ws,
@@ -56,19 +76,21 @@ async fn run_call_loop(api: MediaApi, mut call: SipIncomingCall, call_token: Str
         })
         .await?;
 
-    log::info!("[IncomingCall] call {call_id} got hook action {:?}", res.action);
+    if let Some(action) = res {
+        log::info!("[IncomingCall] call {call_id} got hook action {:?}", action);
 
-    match res.action {
-        IncomingCallAction::Ring => call.send_ringing().await?,
-        IncomingCallAction::Accept => {
-            let stream = res.stream.ok_or(anyhow!("missing stream in accept action"))?;
-            call.accept(api.clone(), stream).await?;
-        }
-        IncomingCallAction::End => {
-            call.end().await.print_error("[IncomingCall] end call from hook response");
-            return Ok(());
-        }
-    };
+        match action.action {
+            IncomingCallAction::Ring => call.send_ringing().await?,
+            IncomingCallAction::Accept => {
+                let stream = action.stream.ok_or(anyhow!("missing stream in accept action"))?;
+                call.accept(api.clone(), stream).await?;
+            }
+            IncomingCallAction::End => {
+                call.end().await.print_error("[IncomingCall] end call from hook response");
+                return Ok(());
+            }
+        };
+    }
 
     log::info!("[IncomingCall] call {call_id} started loop");
 
@@ -77,6 +99,11 @@ async fn run_call_loop(api: MediaApi, mut call: SipIncomingCall, call_token: Str
         match out {
             select2::OrOutput::Left(Ok(Some(out))) => match out {
                 SipIncomingCallOut::Event(event) => {
+                    if is_sip_incoming_cancelled(&event.event).is_some() {
+                        notify_sender.cancel(call_id.clone()).await;
+                    } else if is_sip_incoming_accepted(&event.event).is_some() {
+                        notify_sender.accept(call_id.clone()).await;
+                    }
                     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
                     hook.send(&event);
                 }

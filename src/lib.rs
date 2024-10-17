@@ -1,9 +1,6 @@
 use std::{io, net::SocketAddr, sync::Arc};
 
-use atm0s_small_p2p::{
-    pubsub_service::{PubsubService, PubsubServiceRequester},
-    NetworkAddress, P2pNetwork, P2pNetworkConfig, P2pNetworkEvent, PeerAddress, PeerId, SharedKeyHandshake,
-};
+use atm0s_small_p2p::{pubsub_service::PubsubService, NetworkAddress, P2pNetwork, P2pNetworkConfig, P2pNetworkEvent, PeerAddress, PeerId, SharedKeyHandshake};
 use call_manager::CallManager;
 use hook::HttpHook;
 use http::{HttpCommand, HttpServer};
@@ -58,8 +55,6 @@ pub struct Gateway {
     http_rx: Receiver<HttpCommand>,
     call_manager: CallManager,
     p2p: P2pNetwork<SharedKeyHandshake>,
-    p2p_pubsub_call: PubsubServiceRequester,
-    p2p_pubsub_notify: PubsubServiceRequester,
 }
 
 impl Gateway {
@@ -92,10 +87,8 @@ impl Gateway {
 
         Ok(Self {
             http_rx,
-            call_manager: CallManager::new(p2p_pubsub_call.clone(), cfg.sip_addr, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
+            call_manager: CallManager::new(p2p_pubsub_call, p2p_pubsub_notify, cfg.sip_addr, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
             p2p,
-            p2p_pubsub_call,
-            p2p_pubsub_notify,
         })
     }
 

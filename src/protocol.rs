@@ -2,17 +2,20 @@ use std::hash::{Hash, Hasher};
 
 use atm0s_small_p2p::pubsub_service::PubsubChannelId;
 use derive_more::derive::{Deref, Display, From, Into};
-use ipnet::IpNet;
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+mod address_book;
 mod incoming;
+mod notify;
 mod outgoing;
 pub mod protobuf;
 mod token;
 
+pub use address_book::*;
 pub use incoming::*;
+pub use notify::*;
 pub use outgoing::*;
 pub use token::*;
 
@@ -32,7 +35,7 @@ impl InternalCallId {
     }
 }
 
-#[derive(Debug, Object)]
+#[derive(Debug, Clone, Object, Deserialize)]
 pub struct SipAuth {
     pub username: String,
     pub password: String,
@@ -43,14 +46,6 @@ pub struct StreamingInfo {
     pub room: String,
     pub peer: String,
     pub record: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct PhoneNumber {
-    pub number: String,
-    pub subnets: Vec<IpNet>,
-    pub hook: String,
-    pub app_secret: String,
 }
 
 #[derive(Error, Debug)]

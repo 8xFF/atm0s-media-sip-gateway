@@ -49,9 +49,13 @@ struct Args {
     #[arg(long, env)]
     phone_numbers_sync: Option<String>,
 
+    /// Address PhoneBook sync for incoming calls
+    #[arg(long, env)]
+    apps_sync: Option<String>,
+
     /// Address PhoneBook sync interval
     #[arg(long, env, default_value_t = 30_000)]
-    phone_numbers_sync_interval_ms: u64,
+    sync_interval_ms: u64,
 
     /// Http hook queues
     #[arg(long, env, default_value_t = 20)]
@@ -73,15 +77,17 @@ async fn main() -> Result<(), GatewayError> {
     let args = Args::parse();
     log::info!("Starting server with addr {}, public endpoint {} and sip port {}", args.http_addr, args.http_public, args.sip_addr);
 
-    let secure_ctx = Arc::new(SecureContext::new(&args.secret));
+    let address_book = AddressBookStorage::new(&args.secret);
+    let secure_ctx = Arc::new(SecureContext::new(&args.secret, address_book.clone()));
 
-    let address_book = AddressBookStorage::default();
-    if let Some(sync_url) = args.phone_numbers_sync {
-        let mut address_book_sync = AddressBookSync::new(&sync_url, Duration::from_millis(args.phone_numbers_sync_interval_ms), address_book.clone());
+    if let Some(phone_url) = args.phone_numbers_sync {
+        if let Some(app_url) = args.apps_sync {
+            let mut address_book_sync = AddressBookSync::new(&phone_url, &app_url, Duration::from_millis(args.sync_interval_ms), address_book.clone());
 
-        tokio::spawn(async move {
-            address_book_sync.run_loop().await;
-        });
+            tokio::spawn(async move {
+                address_book_sync.run_loop().await;
+            });
+        }
     }
 
     let cfg = GatewayConfig {

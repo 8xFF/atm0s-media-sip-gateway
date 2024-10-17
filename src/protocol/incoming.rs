@@ -2,7 +2,7 @@ use poem_openapi::{Enum, Object};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    protobuf::sip_gateway::incoming_call_data::{incoming_call_request, incoming_call_response},
+    protobuf::sip_gateway::incoming_call_data::{incoming_call_event, incoming_call_request, incoming_call_response},
     InternalCallId, StreamingInfo,
 };
 
@@ -61,5 +61,26 @@ impl TryFrom<incoming_call_response::Response> for IncomingCallActionResponse {
             incoming_call_response::Response::Error(error) => Err(error.message),
             _ => Ok(IncomingCallActionResponse {}),
         }
+    }
+}
+
+pub fn is_sip_incoming_cancelled(event: &Option<incoming_call_event::Event>) -> Option<()> {
+    match event.as_ref()? {
+        incoming_call_event::Event::Err(..) => None,
+        incoming_call_event::Event::Sip(sip_event) => match &sip_event.event? {
+            incoming_call_event::sip_event::Event::Cancelled(..) => Some(()),
+            incoming_call_event::sip_event::Event::Bye(..) => None,
+        },
+        incoming_call_event::Event::Accepted(..) => None,
+        incoming_call_event::Event::Ended(..) => None,
+    }
+}
+
+pub fn is_sip_incoming_accepted(event: &Option<incoming_call_event::Event>) -> Option<()> {
+    match event.as_ref()? {
+        incoming_call_event::Event::Err(..) => None,
+        incoming_call_event::Event::Sip(..) => None,
+        incoming_call_event::Event::Accepted(..) => Some(()),
+        incoming_call_event::Event::Ended(..) => None,
     }
 }

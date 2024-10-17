@@ -32,10 +32,7 @@ pub struct CallApis {
 impl CallApis {
     #[oai(path = "/outgoing", method = "post")]
     async fn create_call(&self, secret: TokenAuthorization, data: Json<CreateCallRequest>) -> ApiRes<CreateCallResponse, CallApiError> {
-        // TODO dynamic with apps secret
-        if !self.secure_ctx.check_secret(&secret.0.token) {
-            return Err(CallApiError::WrongSecret.into());
-        }
+        let _app_id: crate::protocol::AppId = self.secure_ctx.check_secret(&secret.0.token).ok_or::<CallApiError>(CallApiError::WrongSecret.into())?;
         let media_api = MediaApi::new(&self.media_gateway, &secret.0.token);
 
         let (tx, rx) = oneshot::channel();
