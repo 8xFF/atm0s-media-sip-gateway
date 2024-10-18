@@ -1,62 +1,33 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use anyhow::anyhow;
-use derive_more::derive::{Display, From};
+use atm0s_small_p2p::pubsub_service::PubsubServiceRequester;
 use incoming_call::IncomingCall;
 use outgoing_call::OutgoingCall;
-use thiserror::Error;
-use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    oneshot,
-};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
 use crate::{
     address_book::AddressBookStorage,
-    error::PrintErrorDetails,
-    futures::select2,
     hook::HttpHook,
-    protocol::{CallActionRequest, CallActionResponse, CallApiError, CallDirection, CreateCallRequest, CreateCallResponse, InternalCallId, WsMessage},
+    protocol::{CallApiError, CallDirection, CreateCallRequest, CreateCallResponse, InternalCallId},
     secure::{CallToken, SecureContext},
     sip::{MediaApi, SipServer},
-    utils::http_to_ws,
+    utils::select2,
 };
 
 pub mod incoming_call;
 pub mod outgoing_call;
-
-#[derive(From, PartialEq, Eq, Hash, Clone, Copy, Display)]
-pub struct EmitterId(u64);
-
-impl EmitterId {
-    pub fn rand() -> Self {
-        Self(rand::random())
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum EventEmitterError {
-    #[error("serialize error")]
-    SerializeError,
-    #[error("internal channel error")]
-    InternalChannel,
-}
-
-pub trait EventEmitter: Send + Sync + 'static {
-    fn emitter_id(&self) -> EmitterId;
-    fn fire(&mut self, event: WsMessage);
-}
 
 pub enum CallManagerOut {
     Continue,
     IncomingCall(),
 }
 
-pub struct CallManager<EM> {
-    http_public: String,
+pub struct CallManager {
+    call_pubsub: PubsubServiceRequester,
     sip: SipServer,
     http_hook: HttpHook,
-    out_calls: HashMap<InternalCallId, OutgoingCall<EM>>,
-    in_calls: HashMap<InternalCallId, IncomingCall<EM>>,
+    out_calls: HashMap<InternalCallId, OutgoingCall>,
+    in_calls: HashMap<InternalCallId, IncomingCall>,
     destroy_tx: UnboundedSender<InternalCallId>,
     destroy_rx: UnboundedReceiver<InternalCallId>,
     secure_ctx: Arc<SecureContext>,
@@ -64,12 +35,12 @@ pub struct CallManager<EM> {
     media_gateway: String,
 }
 
-impl<EM: EventEmitter> CallManager<EM> {
-    pub async fn new(sip_addr: SocketAddr, http_public: &str, address_book: AddressBookStorage, secure_ctx: Arc<SecureContext>, http_hook: HttpHook, media_gateway: &str) -> Self {
+impl CallManager {
+    pub async fn new(call_pubsub: PubsubServiceRequester, sip_addr: SocketAddr, address_book: AddressBookStorage, secure_ctx: Arc<SecureContext>, http_hook: HttpHook, media_gateway: &str) -> Self {
         let sip = SipServer::new(sip_addr).await.expect("should create sip-server");
         let (destroy_tx, destroy_rx) = unbounded_channel();
         Self {
-            http_public: http_public.to_owned(),
+            call_pubsub,
             sip,
             http_hook,
             out_calls: HashMap::new(),
@@ -89,69 +60,22 @@ impl<EM: EventEmitter> CallManager<EM> {
         match self.sip.make_call(media_api, &from, &to, req.sip_auth, req.streaming) {
             Ok(call) => {
                 let call_id = call.call_id();
-                let call_token = self.secure_ctx.encode_token(
+                let call_token = self.secure_ctx.encode_call_token(
                     CallToken {
                         direction: CallDirection::Outgoing,
                         call_id: call_id.clone(),
                     },
                     3600,
                 );
-                self.out_calls.insert(call_id.clone(), OutgoingCall::new(call, self.destroy_tx.clone(), hook_sender));
+                self.out_calls
+                    .insert(call_id.clone(), OutgoingCall::new(call, self.destroy_tx.clone(), hook_sender, self.call_pubsub.clone()));
                 Ok(CreateCallResponse {
-                    gateway: self.http_public.clone(),
-                    call_ws: format!("{}/ws/call/{call_id}?token={call_token}", http_to_ws(&self.http_public)),
+                    call_ws: format!("/call/outgoing/{call_id}?token={call_token}"),
                     call_id: call_id.clone().into(),
                     call_token,
                 })
             }
             Err(err) => Err(CallApiError::SipError(err.to_string())),
-        }
-    }
-
-    pub fn subscribe_call(&mut self, call: InternalCallId, emitter: EM) -> Result<(), CallApiError> {
-        if let Some(call) = self.out_calls.get_mut(&call) {
-            call.add_emitter(emitter);
-            Ok(())
-        } else if let Some(call) = self.in_calls.get_mut(&call) {
-            call.add_emitter(emitter);
-            Ok(())
-        } else {
-            Err(CallApiError::CallNotFound)
-        }
-    }
-
-    pub fn unsubscribe_call(&mut self, call: InternalCallId, emitter: EmitterId) -> Result<(), CallApiError> {
-        if let Some(call) = self.out_calls.get_mut(&call) {
-            call.del_emitter(emitter);
-            Ok(())
-        } else if let Some(call) = self.in_calls.get_mut(&call) {
-            call.del_emitter(emitter);
-            Ok(())
-        } else {
-            Err(CallApiError::CallNotFound)
-        }
-    }
-
-    pub fn action_call(&mut self, call: InternalCallId, req: CallActionRequest, tx: oneshot::Sender<anyhow::Result<CallActionResponse>>) {
-        if let Some(_call) = self.out_calls.get_mut(&call) {
-            tx.send(Err(anyhow!("action_call not working with outgoing call")))
-                .print_error_detail("[CallManager] feedback action_call not working with outgoing call");
-        } else if let Some(call) = self.in_calls.get_mut(&call) {
-            call.do_action(req, tx);
-        } else {
-            tx.send(Err(anyhow!("call not found"))).print_error_detail("[CallManager] feedback action_call not found");
-        };
-    }
-
-    pub fn end_call(&mut self, call: InternalCallId) -> Result<(), CallApiError> {
-        if let Some(call) = self.out_calls.get_mut(&call) {
-            call.end();
-            Ok(())
-        } else if let Some(call) = self.in_calls.get_mut(&call) {
-            call.end();
-            Ok(())
-        } else {
-            Err(CallApiError::CallNotFound)
         }
     }
 
@@ -167,18 +91,18 @@ impl<EM: EventEmitter> CallManager<EM> {
             }
             select2::OrOutput::Right(event) => match event? {
                 crate::sip::SipServerOut::Incoming(call) => {
-                    if let Some(number) = self.address_book.allow(call.remote(), call.from(), call.to()) {
+                    if let Some((app, number)) = self.address_book.validate_phone(call.remote(), call.from(), call.to()) {
                         let hook_sender = self.http_hook.new_sender(&number.hook, HashMap::new());
                         let call_id = call.call_id();
-                        let call_token = self.secure_ctx.encode_token(
+                        let call_token = self.secure_ctx.encode_call_token(
                             CallToken {
                                 direction: CallDirection::Outgoing,
                                 call_id: call_id.clone(),
                             },
                             3600,
                         );
-                        let api: MediaApi = MediaApi::new(&self.media_gateway, &number.app_secret);
-                        let call = IncomingCall::new(&self.http_public, api, call, call_token, self.destroy_tx.clone(), hook_sender);
+                        let api: MediaApi = MediaApi::new(&self.media_gateway, &app.app_secret);
+                        let call = IncomingCall::new(api, call, call_token, self.destroy_tx.clone(), hook_sender, self.call_pubsub.clone());
                         self.in_calls.insert(call_id, call);
                         Some(CallManagerOut::IncomingCall())
                     } else {

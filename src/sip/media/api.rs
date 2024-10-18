@@ -28,14 +28,14 @@ struct CreateTokenResponse {
 #[derive(Debug, Clone)]
 pub struct MediaApi {
     gateway: String,
-    secret: String,
+    app_secret: String,
 }
 
 impl MediaApi {
     pub fn new(gateway: &str, secret: &str) -> Self {
         Self {
             gateway: gateway.to_string(),
-            secret: secret.to_string(),
+            app_secret: secret.to_string(),
         }
     }
 
@@ -49,7 +49,7 @@ impl MediaApi {
             .build()
             .expect("Should create client")
             .post(&format!("{}/token/rtpengine", self.gateway))
-            .header("Authorization", format!("Bearer {}", self.secret))
+            .header("Authorization", format!("Bearer {}", self.app_secret))
             .json(&serde_json::json!({
                 "room": room,
                 "peer": peer,
@@ -69,13 +69,14 @@ impl MediaApi {
         }
     }
 
+    #[allow(unused)]
     pub async fn create_webrtc_token(&self, room: &str, peer: &str, record: bool) -> Result<String> {
         let res: CreateTokenResponse = reqwest::ClientBuilder::new()
             .timeout(Duration::from_secs(3))
             .build()
             .expect("Should create client")
             .post(&format!("{}/token/webrtc", self.gateway))
-            .header("Authorization", format!("Bearer {}", self.secret))
+            .header("Authorization", format!("Bearer {}", self.app_secret))
             .json(&serde_json::json!({
                 "room": room,
                 "peer": peer,

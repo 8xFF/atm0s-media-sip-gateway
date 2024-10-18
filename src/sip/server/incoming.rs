@@ -17,7 +17,7 @@ use tokio::sync::{mpsc::Sender, Notify};
 use wait_state::WaitState;
 
 use crate::{
-    protocol::{IncomingCallEvent, InternalCallId, StreamingInfo},
+    protocol::{protobuf::sip_gateway::incoming_call_data::IncomingCallEvent, InternalCallId, StreamingInfo},
     sip::{MediaApi, MediaEngineError},
 };
 

@@ -1,9 +1,9 @@
 use ezk_sip_ua::invite::{create_ack, initiator::Early};
 
 use crate::{
-    futures::select2,
-    protocol::{OutgoingCallEvent, OutgoingCallSipEvent},
-    sip::server::outgoing::{talking_state::TalkingState, State},
+    protocol::protobuf::sip_gateway::outgoing_call_data::outgoing_call_event::sip_event,
+    sip::server::outgoing::{build_sip_event, talking_state::TalkingState, State},
+    utils::select2,
 };
 
 use super::{Ctx, SipOutgoingCallError, StateLogic, StateOut};
@@ -42,7 +42,7 @@ impl StateLogic for EarlyState {
                     // we dont exit here, after that Finished will be called
                     let code = response.line.code.into_u16();
                     log::info!("[EarlyState] on Failure {code}");
-                    Ok(Some(StateOut::Event(OutgoingCallEvent::Sip(OutgoingCallSipEvent::Failure { code }))))
+                    Ok(Some(StateOut::Event(build_sip_event(sip_event::Event::Failure(sip_event::Failure { code: code as u32 })))))
                 }
                 ezk_sip_ua::invite::initiator::Response::Early(_early, _tsx_response, _rseq) => {
                     unreachable!()
@@ -80,7 +80,7 @@ impl StateLogic for EarlyState {
 
                     Ok(Some(StateOut::Switch(
                         State::Talking(TalkingState::new(session)),
-                        OutgoingCallEvent::Sip(OutgoingCallSipEvent::Accepted { code }),
+                        build_sip_event(sip_event::Event::Accepted(sip_event::Accepted { code: code as u32 })),
                     )))
                 }
                 ezk_sip_ua::invite::initiator::EarlyResponse::Terminated => {
