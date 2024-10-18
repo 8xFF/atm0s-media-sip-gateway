@@ -1,5 +1,5 @@
 [package]
-name = "rust-sip-wp"
+name = "atm0s-media-sip-gateway"
 version = "0.1.0"
 edition = "2021"
 
