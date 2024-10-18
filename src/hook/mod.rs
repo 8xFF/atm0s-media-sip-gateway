@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use queue::{new_queue, HttpHookRequest};
 use tokio::sync::mpsc::UnboundedSender;
@@ -6,7 +6,7 @@ use tokio::sync::mpsc::UnboundedSender;
 mod queue;
 mod sender;
 
-pub use sender::{HttpHookSender, HttpHookSenderNoContext};
+pub use sender::HttpHookSender;
 
 pub struct HttpHook {
     queues: Vec<UnboundedSender<HttpHookRequest>>,
@@ -22,20 +22,13 @@ impl HttpHook {
         Self { queues }
     }
 
-    pub fn new_sender(&self, endpoint: &str, headers: HashMap<String, String>) -> HttpHookSender {
+    pub fn new_sender<E>(&self, endpoint: &str, headers: HashMap<String, String>) -> HttpHookSender<E> {
         let index = rand::random::<usize>() % self.queues.len();
         HttpHookSender {
             endpoint: endpoint.to_owned(),
             headers,
             tx: self.queues[index].clone(),
-        }
-    }
-
-    pub fn new_sender_no_context(&self, headers: HashMap<String, String>) -> HttpHookSenderNoContext {
-        let index = rand::random::<usize>() % self.queues.len();
-        HttpHookSenderNoContext {
-            headers,
-            tx: self.queues[index].clone(),
+            _tmp: PhantomData,
         }
     }
 }

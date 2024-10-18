@@ -76,18 +76,15 @@ impl Gateway {
 
         let mut pubsub_call = PubsubService::new(p2p.create_service(0.into()));
         let p2p_pubsub_call = pubsub_call.requester();
-        let mut pubsub_notify = PubsubService::new(p2p.create_service(1.into()));
-        let p2p_pubsub_notify = pubsub_notify.requester();
         let http_hook = HttpHook::new(cfg.http_hook_queues);
 
-        let (mut http, http_rx) = HttpServer::new(cfg.http_addr, &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone(), p2p_pubsub_notify.clone());
+        let (mut http, http_rx) = HttpServer::new(cfg.http_addr, &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone());
         tokio::spawn(async move { http.run_loop().await });
         tokio::spawn(async move { while let Ok(_) = pubsub_call.run_loop().await {} });
-        tokio::spawn(async move { while let Ok(_) = pubsub_notify.run_loop().await {} });
 
         Ok(Self {
             http_rx,
-            call_manager: CallManager::new(p2p_pubsub_call, p2p_pubsub_notify, cfg.sip_addr, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
+            call_manager: CallManager::new(p2p_pubsub_call, cfg.sip_addr, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
             p2p,
         })
     }

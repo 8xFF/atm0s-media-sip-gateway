@@ -2,30 +2,6 @@ syntax = "proto3";
 
 package sip_gateway;
 
-message IncomingCallNotify {
-    message CallArrived {
-        string call_token = 1;
-        string call_ws = 2;
-        string from = 3;
-        string to = 4;
-    }
-
-    message CallCancelled {
-
-    }
-
-    message CallAccepted {
-
-    }
-
-    string call_id = 1;
-    oneof event {
-        CallArrived arrived = 10;
-        CallCancelled cancelled = 11;
-        CallAccepted accepted = 12;
-    }
-}
-
 message IncomingCallData {
     message IncomingCallEvent {
         message SipEvent {
@@ -210,5 +186,40 @@ message OutgoingCallData {
         OutgoingCallEvent event = 1;
         OutgoingCallRequest request = 2;
         OutgoingCallResponse response = 3;
+    }
+}
+
+message IncomingCallNotify {
+    message CallArrived {
+        string call_token = 1;
+        string call_ws = 2;
+        string call_from = 3;
+        string call_to = 4;
+    }
+
+    message CallCancelled {
+        string call_from = 3;
+        string call_to = 4;
+    }
+
+    message CallAccepted {
+        string call_from = 3;
+        string call_to = 4;
+    }
+
+    string call_id = 1;
+    oneof event {
+        CallArrived arrived = 10;
+        CallCancelled cancelled = 11;
+        CallAccepted accepted = 12;
+    }
+}
+
+
+message CallEvent {
+    oneof event {
+        IncomingCallNotify notify = 1;
+        OutgoingCallData.OutgoingCallEvent outgoing = 2;
+        IncomingCallData.IncomingCallEvent incoming = 3;
     }
 }

@@ -7,7 +7,11 @@ use crate::{
     error::PrintErrorSimple,
     hook::HttpHookSender,
     protocol::{
-        protobuf::sip_gateway::outgoing_call_data::{outgoing_call_event, outgoing_call_request, outgoing_call_response, OutgoingCallEvent},
+        protobuf::sip_gateway::{
+            call_event,
+            outgoing_call_data::{outgoing_call_event, outgoing_call_request, outgoing_call_response, OutgoingCallEvent},
+            CallEvent,
+        },
         InternalCallId,
     },
     sip::{SipOutgoingCall, SipOutgoingCallOut},
@@ -17,14 +21,14 @@ use crate::{
 pub struct OutgoingCall {}
 
 impl OutgoingCall {
-    pub fn new(sip: SipOutgoingCall, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender, call_pubsub: PubsubServiceRequester) -> Self {
+    pub fn new(sip: SipOutgoingCall, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender<CallEvent>, call_pubsub: PubsubServiceRequester) -> Self {
         tokio::spawn(async move { run_call_loop(sip, destroy_tx, hook, call_pubsub).await });
 
         Self {}
     }
 }
 
-async fn run_call_loop(mut call: SipOutgoingCall, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender, call_pubsub: PubsubServiceRequester) {
+async fn run_call_loop(mut call: SipOutgoingCall, destroy_tx: UnboundedSender<InternalCallId>, hook: HttpHookSender<CallEvent>, call_pubsub: PubsubServiceRequester) {
     let call_id = call.call_id();
     let channel_id = call_id.to_pubsub_channel();
     let mut subscribers = HashSet::new();
@@ -45,8 +49,8 @@ async fn run_call_loop(mut call: SipOutgoingCall, destroy_tx: UnboundedSender<In
         match out {
             select2::OrOutput::Left(Ok(Some(out))) => match out {
                 SipOutgoingCallOut::Event(event) => {
-                    hook.send(&event);
                     publisher.requester().publish_ob(&event).await.print_error("[OutgoingCall] send event");
+                    hook.send(&build_call_event(event));
                 }
                 SipOutgoingCallOut::Continue => {}
             },
@@ -60,7 +64,7 @@ async fn run_call_loop(mut call: SipOutgoingCall, destroy_tx: UnboundedSender<In
                     event: Some(outgoing_call_event::Event::Err(outgoing_call_event::Error { message: e.to_string() })),
                 };
                 publisher.requester().publish_ob(&event).await.print_error("[OutgoingCall] send event");
-                hook.send(&event);
+                hook.send(&build_call_event(event));
                 break;
             }
             select2::OrOutput::Right(Ok(control)) => match control {
@@ -100,6 +104,12 @@ async fn run_call_loop(mut call: SipOutgoingCall, destroy_tx: UnboundedSender<In
         event: Some(outgoing_call_event::Event::Ended(Default::default())),
     };
     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
-    hook.send(&event);
+    hook.send(&build_call_event(event));
     destroy_tx.send(call_id).expect("should send destroy request to main loop");
+}
+
+fn build_call_event(event: OutgoingCallEvent) -> CallEvent {
+    CallEvent {
+        event: Some(call_event::Event::Outgoing(event)),
+    }
 }

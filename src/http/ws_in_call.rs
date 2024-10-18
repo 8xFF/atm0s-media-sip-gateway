@@ -82,7 +82,7 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                 OrOutput::Middle(event) => match event {
                     Some(msg) => {
                         let data = msg.encode_to_vec();
-                        log::info!("[WsCall {call_id}] emit data {data:?}");
+                        log::info!("[WsCall {call_id}] emit data {msg:?}");
                         if let Err(e) = sink.send(WebsocketMessage::Binary(data)).await {
                             log::error!("[WsCall {call_id}] send data error {e:?}");
                             break;

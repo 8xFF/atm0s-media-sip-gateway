@@ -3,19 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     protobuf::sip_gateway::incoming_call_data::{incoming_call_event, incoming_call_request, incoming_call_response},
-    InternalCallId, StreamingInfo,
+    StreamingInfo,
 };
-
-#[derive(Debug, Serialize)]
-pub struct HookIncomingCallRequest {
-    pub call_id: InternalCallId,
-    pub call_token: String,
-    pub call_ws: String,
-    pub from: String,
-    pub to: String,
-}
-
-pub type HookIncomingCallResponse = IncomingCallActionRequest;
 
 #[derive(Debug, Enum, Serialize, Deserialize)]
 pub enum IncomingCallAction {

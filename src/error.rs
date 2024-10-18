@@ -4,6 +4,7 @@ pub trait PrintErrorSimple {
     fn print_error(&self, prefix: &str);
 }
 
+#[allow(unused)]
 pub trait PrintErrorDetails {
     fn print_error_detail(&self, prefix: &str);
 }

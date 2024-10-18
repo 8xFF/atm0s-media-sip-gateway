@@ -14,20 +14,12 @@ pub struct AppInfo {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type")]
-pub enum PhoneNumberRoute {
-    Static { client: String },
-    Dynamic { hook: String },
-}
-
-#[derive(Debug, Clone, Deserialize)]
 pub struct PhoneNumber {
     pub number: String,
     pub subnets: Vec<IpNet>,
     pub auth: Option<SipAuth>,
     pub app_id: String,
     pub hook: String,
-    pub route: PhoneNumberRoute,
 }
 
 #[derive(Debug, Deserialize)]

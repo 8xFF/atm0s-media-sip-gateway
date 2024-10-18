@@ -1,7 +1,7 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use atm0s_small_p2p::pubsub_service::PubsubServiceRequester;
-use incoming_call::{IncomingCall, IncomingCallNotifySender};
+use incoming_call::IncomingCall;
 use outgoing_call::OutgoingCall;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 
@@ -24,7 +24,6 @@ pub enum CallManagerOut {
 
 pub struct CallManager {
     call_pubsub: PubsubServiceRequester,
-    notify_pubsub: PubsubServiceRequester,
     sip: SipServer,
     http_hook: HttpHook,
     out_calls: HashMap<InternalCallId, OutgoingCall>,
@@ -37,20 +36,11 @@ pub struct CallManager {
 }
 
 impl CallManager {
-    pub async fn new(
-        call_pubsub: PubsubServiceRequester,
-        notify_pubsub: PubsubServiceRequester,
-        sip_addr: SocketAddr,
-        address_book: AddressBookStorage,
-        secure_ctx: Arc<SecureContext>,
-        http_hook: HttpHook,
-        media_gateway: &str,
-    ) -> Self {
+    pub async fn new(call_pubsub: PubsubServiceRequester, sip_addr: SocketAddr, address_book: AddressBookStorage, secure_ctx: Arc<SecureContext>, http_hook: HttpHook, media_gateway: &str) -> Self {
         let sip = SipServer::new(sip_addr).await.expect("should create sip-server");
         let (destroy_tx, destroy_rx) = unbounded_channel();
         Self {
             call_pubsub,
-            notify_pubsub,
             sip,
             http_hook,
             out_calls: HashMap::new(),
@@ -112,8 +102,7 @@ impl CallManager {
                             3600,
                         );
                         let api: MediaApi = MediaApi::new(&self.media_gateway, &app.app_secret);
-                        let notify_sender = IncomingCallNotifySender::new(number, self.notify_pubsub.clone(), self.http_hook.new_sender_no_context(Default::default()));
-                        let call = IncomingCall::new(api, call, call_token, self.destroy_tx.clone(), hook_sender, self.call_pubsub.clone(), notify_sender);
+                        let call = IncomingCall::new(api, call, call_token, self.destroy_tx.clone(), hook_sender, self.call_pubsub.clone());
                         self.in_calls.insert(call_id, call);
                         Some(CallManagerOut::IncomingCall())
                     } else {

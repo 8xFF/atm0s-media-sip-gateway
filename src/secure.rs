@@ -2,12 +2,11 @@ use jwt_simple::prelude::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
-    protocol::{AppId, CallDirection, InternalCallId, NotifyIdentify},
+    protocol::{AppId, CallDirection, InternalCallId},
     AddressBookStorage,
 };
 
 const CALL_ISSUER: &str = "call";
-const NOTIFY_ISSUER: &str = "noti";
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 pub struct CallToken {
@@ -37,16 +36,8 @@ impl SecureContext {
         self.encode_token(token, CALL_ISSUER, duration_secs)
     }
 
-    pub fn encode_notify_token(&self, identify: NotifyIdentify, duration_secs: u64) -> String {
-        self.encode_token(identify, NOTIFY_ISSUER, duration_secs)
-    }
-
     pub fn decode_call_token(&self, token: &str) -> Option<CallToken> {
         self.decode_token(token, CALL_ISSUER)
-    }
-
-    pub fn decode_notify_token(&self, token: &str) -> Option<NotifyIdentify> {
-        self.decode_token(token, NOTIFY_ISSUER)
     }
 
     fn encode_token<T: Serialize + DeserializeOwned>(&self, token: T, issuer: &str, duration_secs: u64) -> String {
@@ -88,14 +79,6 @@ mod tests {
         let encoded_token = context.encode_call_token(call_token.clone(), 100);
         let decoded_token = context.decode_call_token(&encoded_token).unwrap();
         assert_eq!(decoded_token, call_token);
-
-        let notify_token = NotifyIdentify {
-            app: "app1".to_owned().into(),
-            client: "client1".to_owned(),
-        };
-        let encoded_token = context.encode_notify_token(notify_token.clone(), 100);
-        let decoded_token = context.decode_notify_token(&encoded_token).unwrap();
-        assert_eq!(decoded_token, notify_token);
     }
 
     #[test]
@@ -112,14 +95,5 @@ mod tests {
         // Simulate expiration by waiting (or mocking the clock)
         std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for token to expire
         assert_eq!(context.decode_call_token(&encoded_token), None);
-
-        let notify_token = NotifyIdentify {
-            app: "app1".to_owned().into(),
-            client: "client1".to_owned(),
-        };
-        let encoded_token = context.encode_notify_token(notify_token, 1);
-        // Simulate expiration by waiting (or mocking the clock)
-        std::thread::sleep(std::time::Duration::from_secs(2)); // Wait for token to expire
-        assert_eq!(context.decode_notify_token(&encoded_token), None);
     }
 }

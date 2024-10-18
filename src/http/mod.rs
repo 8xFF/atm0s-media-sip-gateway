@@ -14,11 +14,9 @@ use tokio::sync::{
 };
 
 mod api_call;
-mod api_token;
 mod header_secret;
 mod response_result;
 mod ws_in_call;
-mod ws_in_notify;
 mod ws_out_call;
 
 pub enum HttpCommand {
@@ -31,11 +29,10 @@ pub struct HttpServer {
     secure_ctx: Arc<SecureContext>,
     tx: Sender<HttpCommand>,
     call_pubsub: PubsubServiceRequester,
-    notify_pubsub: PubsubServiceRequester,
 }
 
 impl HttpServer {
-    pub fn new(addr: SocketAddr, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester, notify_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
+    pub fn new(addr: SocketAddr, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
         let (tx, rx) = channel(10);
         (
             Self {
@@ -44,7 +41,6 @@ impl HttpServer {
                 tx,
                 secure_ctx,
                 call_pubsub,
-                notify_pubsub,
             },
             rx,
         )
@@ -61,18 +57,10 @@ impl HttpServer {
         let call_ui = call_service.swagger_ui();
         let call_spec = call_service.spec();
 
-        let token_api = api_token::TokenApis { secure_ctx: self.secure_ctx.clone() };
-        let token_service: OpenApiService<_, ()> = OpenApiService::new(token_api, "Console token APIs", env!("CARGO_PKG_VERSION")).server("/").url_prefix("/token");
-        let token_ui = token_service.swagger_ui();
-        let token_spec = token_service.spec();
-
         let app = Route::new()
             .nest("/call/", call_service)
             .nest("/docs/call/", call_ui)
             .at("/docs/call/spec", poem::endpoint::make_sync(move |_| call_spec.clone()))
-            .nest("/token/", token_service)
-            .nest("/docs/token/", token_ui)
-            .at("/docs/token/spec", poem::endpoint::make_sync(move |_| token_spec.clone()))
             .at(
                 "/call/outgoing/:call_id",
                 get(ws_out_call::ws_single_call).data(ws_out_call::WebsocketCallCtx {
@@ -85,13 +73,6 @@ impl HttpServer {
                 get(ws_in_call::ws_single_call).data(ws_in_call::WebsocketCallCtx {
                     secure_ctx: self.secure_ctx.clone(),
                     call_pubsub: self.call_pubsub.clone(),
-                }),
-            )
-            .at(
-                "/call/incoming/notify",
-                get(ws_in_notify::ws_single_notify).data(ws_in_notify::WebsocketNotifyCtx {
-                    secure_ctx: self.secure_ctx.clone(),
-                    notify_pubsub: self.notify_pubsub.clone(),
                 }),
             )
             .with(Tracing::default());

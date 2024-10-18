@@ -8,16 +8,12 @@ use thiserror::Error;
 
 mod address_book;
 mod incoming;
-mod notify;
 mod outgoing;
 pub mod protobuf;
-mod token;
 
 pub use address_book::*;
 pub use incoming::*;
-pub use notify::*;
 pub use outgoing::*;
-pub use token::*;
 
 /// Note that his call_id is from internal state and not a SipCallID
 #[derive(Debug, From, Into, Deref, Clone, Display, Hash, PartialEq, Eq, Serialize, Deserialize)]
