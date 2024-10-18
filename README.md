@@ -1,4 +1,3 @@
-```markdown:README.md
 # SIP Gateway for atm0s-media-server
 
 ## Overview
