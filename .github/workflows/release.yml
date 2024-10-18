@@ -120,14 +120,14 @@ jobs:
         with:
           name: ${{ matrix.target }}
           path: |
-            *-${{ matrix.target }}${{ matrix.extension }}
+            target/${{ matrix.target }}/release/${{ env.APP_NAME }}${{ matrix.extension }}
 
       - name: Upload server binarie to release
         if: startsWith(github.ref, 'refs/tags/')
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ env.APP_NAME }}-${{ matrix.target }}${{ matrix.extension }}
+          file: target/${{ matrix.target }}/release/${{ env.APP_NAME }}${{ matrix.extension }}
           asset_name: ${{ env.APP_NAME }}-${{ matrix.target }}${{ matrix.extension }}
           tag: ${{ github.ref }}
           overwrite: true
