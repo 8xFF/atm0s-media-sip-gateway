@@ -25,9 +25,9 @@ jobs:
       matrix:
         build:
           - linux gnu x64
-          - linux musl x64
+          # - linux musl x64
           - linux gnu aarch64
-          - linux musl aarch64
+          # - linux musl aarch64
           # - linux gnueabihf arm
           # - linux gnueabihf armv7
           # - linux gnu mips
@@ -41,97 +41,68 @@ jobs:
         include:
           - build: linux gnu x64
             os: ubuntu-latest
-            rust: stable
             target: x86_64-unknown-linux-gnu
             extension: ""
-            cross: false
-            build_record_tool: true
-          - build: linux musl x64
-            os: ubuntu-latest
-            rust: stable
-            target: x86_64-unknown-linux-musl
-            extension: ""
-            cross: false
+          # - build: linux musl x64
+          #   os: ubuntu-latest
+          #   target: x86_64-unknown-linux-musl
+          #   extension: ""
           - build: linux gnu aarch64
             os: ubuntu-latest
-            rust: stable
             target: aarch64-unknown-linux-gnu
             extension: ""
-            cross: true
-          - build: linux musl aarch64
-            os: ubuntu-latest
-            rust: stable
-            target: aarch64-unknown-linux-musl
-            extension: ""
-            cross: true
+          # - build: linux musl aarch64
+          #   os: ubuntu-latest
+          #   target: aarch64-unknown-linux-musl
+          #   extension: ""
           # - build: linux gnueabihf arm
           #   os: ubuntu-latest
-          #   rust: stable
           #   target: arm-unknown-linux-gnueabihf
           #   extension: ""
-          #   cross: true
           # - build: linux gnueabihf armv7
           #   os: ubuntu-latest
-          #   rust: stable
           #   target: armv7-unknown-linux-gnueabihf
           #   extension: ""
-          #   cross: true
           # - build: linux gnu mips
           #   os: ubuntu-latest
           #   rust: 1.71.1
           #   target: mips-unknown-linux-gnu
           #   extension: ""
-          #   cross: true
           # - build: linux gnuabi64 mips64
           #   os: ubuntu-latest
           #   rust: 1.71.1
           #   target: mips64-unknown-linux-gnuabi64
           #   extension: ""
-          #   cross: true
           # - build: linux gnuabi64 mips64el
           #   os: ubuntu-latest
           #   rust: 1.71.1
           #   target: mips64el-unknown-linux-gnuabi64
           #   extension: ""
-          #   cross: true
           # - build: linux gnu mipsel
           #   os: ubuntu-latest
           #   rust: 1.71.1
           #   target: mipsel-unknown-linux-gnu
           #   extension: ""
-          #   cross: true
           # - build: linux musl aarch64
           #   os: ubuntu-latest
-          #   rust: stable
           #   target: aarch64-unknown-linux-musl
           #   extension: ""
-          #   cross: true
           - build: macos x64
             os: macos-latest
-            rust: stable
             target: x86_64-apple-darwin
             extension: ""
-            cross: false
-            build_record_tool: true
           - build: macos aarch64
             os: macos-latest
-            rust: stable
             target: aarch64-apple-darwin
             extension: ""
-            cross: true
-            build_record_tool: true
           # - build: windows gnu x64
           #   os: ubuntu-latest
-          #   rust: stable
           #   target: x86_64-pc-windows-gnu
           #   extension: ".exe"
-          #   cross: false
           # - build: windows msvc x64
           #   os: windows-latest
-          #   rust: stable
           #   target: x86_64-pc-windows-msvc
           #   extension: ".exe"
-          #   cross: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -144,12 +115,12 @@ jobs:
           override: true
           target: ${{ matrix.target }}
 
-      - name: Build server
-        uses: actions-rs/cargo@v1
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
         with:
-          use-cross: ${{ matrix.cross }}
-          command: build
-          args: --verbose --release --target ${{ matrix.target }}
+          target: ${{ matrix.target }}
+          args: "--locked --release"
+          strip: true
 
       - name: Upload Artifact to Summary
         if: ${{ matrix.build != 'windows gnu x64' && matrix.build != 'windows msvc x64' }}
