@@ -1,7 +1,7 @@
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 
+use atm0s_media_sip_gateway::{AddressBookStorage, AddressBookSync, Gateway, GatewayConfig, GatewayError, SecureContext};
 use clap::Parser;
-use rust_sip_wp::{AddressBookStorage, AddressBookSync, Gateway, GatewayConfig, GatewayError, SecureContext};
 
 /// Sip Gateway for atm0s-media-server
 #[derive(Parser, Debug)]

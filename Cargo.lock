@@ -161,6 +161,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "atm0s-media-sip-gateway"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "atm0s-small-p2p",
+ "bytes",
+ "bytesstr",
+ "clap",
+ "derive_more",
+ "ezk-sdp-types",
+ "ezk-sip-auth",
+ "ezk-sip-core",
+ "ezk-sip-types",
+ "ezk-sip-ua",
+ "futures-util",
+ "ipnet",
+ "jwt-simple",
+ "log",
+ "pin-project-lite",
+ "poem",
+ "poem-openapi",
+ "prost",
+ "prost-build",
+ "rand",
+ "reqwest",
+ "rustls",
+ "serde",
+ "serde_json",
+ "spin",
+ "thiserror",
+ "tokio",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "atm0s-small-p2p"
 version = "0.1.0"
 source = "git+https://github.com/8xFF/atm0s-small-p2p.git?rev=2896a1f0d78e597105a2aa0d256a2a31dbf4809f#2896a1f0d78e597105a2aa0d256a2a31dbf4809f"
@@ -2521,42 +2557,6 @@ dependencies = [
  "spki",
  "subtle",
  "zeroize",
-]
-
-[[package]]
-name = "rust-sip-wp"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "atm0s-small-p2p",
- "bytes",
- "bytesstr",
- "clap",
- "derive_more",
- "ezk-sdp-types",
- "ezk-sip-auth",
- "ezk-sip-core",
- "ezk-sip-types",
- "ezk-sip-ua",
- "futures-util",
- "ipnet",
- "jwt-simple",
- "log",
- "pin-project-lite",
- "poem",
- "poem-openapi",
- "prost",
- "prost-build",
- "rand",
- "reqwest",
- "rustls",
- "serde",
- "serde_json",
- "spin",
- "thiserror",
- "tokio",
- "tracing-subscriber",
 ]
 
 [[package]]
