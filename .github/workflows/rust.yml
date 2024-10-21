@@ -2,12 +2,12 @@ name: Rust
 
 on:
   push:
-    branches: ["master"]
+    branches: ["main"]
     paths-ignore:
       - "docs/**"
 
   pull_request:
-    branches: ["master"]
+    branches: ["main"]
     paths-ignore:
       - "docs/**"
 
