@@ -1,7 +1,10 @@
 use std::collections::HashSet;
 
 use anyhow::anyhow;
-use atm0s_small_p2p::pubsub_service::{PublisherEventOb, PubsubServiceRequester};
+use atm0s_small_p2p::{
+    now_ms,
+    pubsub_service::{PublisherEventOb, PubsubServiceRequester},
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
@@ -248,6 +251,7 @@ fn build_call_notify_accept(call_id: &InternalCallId, from: &str, to: &str) -> C
 
 fn build_call_notify(call_id: &InternalCallId, event: incoming_call_notify::Event) -> CallEvent {
     CallEvent {
+        timestamp: now_ms(),
         event: Some(call_event::Event::Notify(IncomingCallNotify {
             call_id: call_id.clone().into(),
             event: Some(event),
@@ -257,6 +261,7 @@ fn build_call_notify(call_id: &InternalCallId, event: incoming_call_notify::Even
 
 fn build_call_event(event: IncomingCallEvent) -> CallEvent {
     CallEvent {
+        timestamp: now_ms(),
         event: Some(call_event::Event::Incoming(event)),
     }
 }

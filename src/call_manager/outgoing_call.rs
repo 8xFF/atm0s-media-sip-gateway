@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use atm0s_small_p2p::pubsub_service::{PublisherEventOb, PubsubServiceRequester};
+use atm0s_small_p2p::{
+    now_ms,
+    pubsub_service::{PublisherEventOb, PubsubServiceRequester},
+};
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
@@ -55,6 +58,7 @@ async fn run_call_loop(
         match out {
             select2::OrOutput::Left(Ok(Some(out))) => match out {
                 SipOutgoingCallOut::Event(event) => {
+                    log::info!("[OutgoingCall] send event {event:?}");
                     publisher.requester().publish_ob(&event).await.print_error("[OutgoingCall] send event");
                     hook.send(hook_content_type, build_call_event(event));
                 }
@@ -116,6 +120,7 @@ async fn run_call_loop(
 
 fn build_call_event(event: OutgoingCallEvent) -> CallEvent {
     CallEvent {
+        timestamp: now_ms(),
         event: Some(call_event::Event::Outgoing(event)),
     }
 }

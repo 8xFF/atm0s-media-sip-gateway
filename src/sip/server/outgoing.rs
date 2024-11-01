@@ -1,6 +1,7 @@
 use std::io;
 
 use calling_state::CallingState;
+use canceling_state::CancelingState;
 use early_state::EarlyState;
 use ezk_sip_auth::{
     digest::{DigestAuthenticator, DigestCredentials},
@@ -27,9 +28,11 @@ use crate::{
 };
 
 mod calling_state;
+mod canceling_state;
 mod early_state;
 mod talking_state;
 
+#[derive(Debug)]
 enum StateOut {
     Event(OutgoingCallEvent),
     Switch(State, OutgoingCallEvent),
@@ -47,10 +50,12 @@ struct OutgoingAuth {
     credentials: CredentialStore,
 }
 
+#[derive(Debug)]
 enum State {
     Calling(CallingState),
     Early(EarlyState),
     Talking(TalkingState),
+    Canceling(CancelingState),
 }
 
 impl StateLogic for State {
@@ -59,6 +64,7 @@ impl StateLogic for State {
             State::Calling(state) => state.start(ctx).await,
             State::Early(state) => state.start(ctx).await,
             State::Talking(state) => state.start(ctx).await,
+            State::Canceling(state) => state.start(ctx).await,
         }
     }
     async fn end(&mut self, ctx: &mut Ctx) -> Result<(), SipOutgoingCallError> {
@@ -66,6 +72,7 @@ impl StateLogic for State {
             State::Calling(state) => state.end(ctx).await,
             State::Early(state) => state.end(ctx).await,
             State::Talking(state) => state.end(ctx).await,
+            State::Canceling(state) => state.end(ctx).await,
         }
     }
     async fn recv(&mut self, ctx: &mut Ctx) -> Result<Option<StateOut>, SipOutgoingCallError> {
@@ -73,6 +80,7 @@ impl StateLogic for State {
             State::Calling(state) => state.recv(ctx).await,
             State::Early(state) => state.recv(ctx).await,
             State::Talking(state) => state.recv(ctx).await,
+            State::Canceling(state) => state.recv(ctx).await,
         }
     }
 }

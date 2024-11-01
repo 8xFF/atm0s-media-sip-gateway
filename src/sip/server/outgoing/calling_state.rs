@@ -3,15 +3,19 @@ use ezk_sip_types::header::typed::ContentType;
 use ezk_sip_ua::invite::{create_ack, initiator::Response};
 
 use crate::{
-    protocol::protobuf::sip_gateway::outgoing_call_data::outgoing_call_event::sip_event,
+    protocol::protobuf::sip_gateway::outgoing_call_data::{
+        outgoing_call_event::{self, sip_event},
+        OutgoingCallEvent,
+    },
     sip::server::outgoing::{build_sip_event, early_state::EarlyState, talking_state::TalkingState, State},
 };
 
-use super::{Ctx, SipOutgoingCallError, StateLogic, StateOut};
+use super::{canceling_state::CancelingState, Ctx, SipOutgoingCallError, StateLogic, StateOut};
 
 #[derive(Debug, Default)]
 pub struct CallingState {
     auth_failed: bool,
+    cancelled: bool,
 }
 
 impl StateLogic for CallingState {
@@ -37,11 +41,22 @@ impl StateLogic for CallingState {
         if let Some(auth) = &mut ctx.auth {
             auth.session.authorize_request(&mut cancel.headers);
         }
+        log::info!("[CallingState] end => send cancel");
         ctx.initiator.send_cancel(cancel).await?;
+        self.cancelled = true;
         Ok(())
     }
 
     async fn recv(&mut self, ctx: &mut Ctx) -> Result<Option<StateOut>, SipOutgoingCallError> {
+        if self.cancelled {
+            return Ok(Some(StateOut::Switch(
+                State::Canceling(CancelingState),
+                OutgoingCallEvent {
+                    event: Some(outgoing_call_event::Event::Cancelled(Default::default())),
+                },
+            )));
+        }
+
         match ctx.initiator.receive().await? {
             Response::Provisional(response) => {
                 let code = response.line.code.into_u16();

@@ -177,7 +177,7 @@ pub mod outgoing_call_data {
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct OutgoingCallEvent {
-        #[prost(oneof = "outgoing_call_event::Event", tags = "1, 2, 3")]
+        #[prost(oneof = "outgoing_call_event::Event", tags = "1, 2, 3, 4, 5")]
         pub event: ::core::option::Option<outgoing_call_event::Event>,
     }
     /// Nested message and enum types in `OutgoingCallEvent`.
@@ -232,6 +232,14 @@ pub mod outgoing_call_data {
                 Bye(Bye),
             }
         }
+        /// user sent cancel
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Cancelled {}
+        /// user sent bye
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Terminated {}
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct Ended {}
@@ -250,6 +258,10 @@ pub mod outgoing_call_data {
             Sip(SipEvent),
             #[prost(message, tag = "3")]
             Ended(Ended),
+            #[prost(message, tag = "4")]
+            Cancelled(Cancelled),
+            #[prost(message, tag = "5")]
+            Terminated(Terminated),
         }
     }
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -363,6 +375,8 @@ pub mod incoming_call_notify {
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CallEvent {
+    #[prost(uint64, tag = "10")]
+    pub timestamp: u64,
     #[prost(oneof = "call_event::Event", tags = "1, 2, 3")]
     pub event: ::core::option::Option<call_event::Event>,
 }

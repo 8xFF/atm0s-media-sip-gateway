@@ -140,6 +140,16 @@ message OutgoingCallData {
             }
         }
 
+        // user sent cancel
+        message Cancelled {
+
+        }
+
+        // user sent bye
+        message Terminated {
+
+        }
+
         message Ended {
 
         }
@@ -152,6 +162,8 @@ message OutgoingCallData {
             Error err = 1;
             SipEvent sip = 2;
             Ended ended = 3;
+            Cancelled cancelled = 4;
+            Terminated terminated = 5;
         }
     }
     
@@ -222,4 +234,6 @@ message CallEvent {
         OutgoingCallData.OutgoingCallEvent outgoing = 2;
         IncomingCallData.IncomingCallEvent incoming = 3;
     }
+
+    uint64 timestamp = 10;
 }
