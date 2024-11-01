@@ -8,7 +8,7 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use crate::{
     address_book::AddressBookStorage,
     hook::HttpHook,
-    protocol::{CallApiError, CallDirection, CreateCallRequest, CreateCallResponse, InternalCallId},
+    protocol::{protobuf::sip_gateway::CallEvent, CallApiError, CallDirection, CreateCallRequest, CreateCallResponse, InternalCallId},
     secure::{CallToken, SecureContext},
     sip::{MediaApi, SipServer},
     utils::select2,
@@ -25,7 +25,7 @@ pub enum CallManagerOut {
 pub struct CallManager {
     call_pubsub: PubsubServiceRequester,
     sip: SipServer,
-    http_hook: HttpHook,
+    http_hook: HttpHook<CallEvent>,
     out_calls: HashMap<InternalCallId, OutgoingCall>,
     in_calls: HashMap<InternalCallId, IncomingCall>,
     destroy_tx: UnboundedSender<InternalCallId>,
@@ -36,7 +36,14 @@ pub struct CallManager {
 }
 
 impl CallManager {
-    pub async fn new(call_pubsub: PubsubServiceRequester, sip_addr: SocketAddr, address_book: AddressBookStorage, secure_ctx: Arc<SecureContext>, http_hook: HttpHook, media_gateway: &str) -> Self {
+    pub async fn new(
+        call_pubsub: PubsubServiceRequester,
+        sip_addr: SocketAddr,
+        address_book: AddressBookStorage,
+        secure_ctx: Arc<SecureContext>,
+        http_hook: HttpHook<CallEvent>,
+        media_gateway: &str,
+    ) -> Self {
         let sip = SipServer::new(sip_addr).await.expect("should create sip-server");
         let (destroy_tx, destroy_rx) = unbounded_channel();
         Self {
@@ -67,8 +74,10 @@ impl CallManager {
                     },
                     3600,
                 );
-                self.out_calls
-                    .insert(call_id.clone(), OutgoingCall::new(call, self.destroy_tx.clone(), hook_sender, self.call_pubsub.clone()));
+                self.out_calls.insert(
+                    call_id.clone(),
+                    OutgoingCall::new(call, self.destroy_tx.clone(), req.hook_content_type, hook_sender, self.call_pubsub.clone()),
+                );
                 Ok(CreateCallResponse {
                     call_ws: format!("/call/outgoing/{call_id}?token={call_token}"),
                     call_id: call_id.clone().into(),
@@ -102,7 +111,7 @@ impl CallManager {
                             3600,
                         );
                         let api: MediaApi = MediaApi::new(&self.media_gateway, &app.app_secret);
-                        let call = IncomingCall::new(api, call, call_token, self.destroy_tx.clone(), hook_sender, self.call_pubsub.clone());
+                        let call = IncomingCall::new(api, call, call_token, self.destroy_tx.clone(), number.hook_content_type, hook_sender, self.call_pubsub.clone());
                         self.in_calls.insert(call_id, call);
                         Some(CallManagerOut::IncomingCall())
                     } else {

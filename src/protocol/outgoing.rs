@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     protobuf::sip_gateway::outgoing_call_data::{outgoing_call_request, outgoing_call_response},
-    SipAuth, StreamingInfo,
+    HookContentType, SipAuth, StreamingInfo,
 };
 
 #[derive(Debug, Object)]
@@ -13,6 +13,7 @@ pub struct CreateCallRequest {
     pub from_number: String,
     pub to_number: String,
     pub hook: String,
+    pub hook_content_type: HookContentType,
     pub streaming: StreamingInfo,
 }
 

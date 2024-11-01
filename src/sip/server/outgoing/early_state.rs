@@ -1,20 +1,25 @@
 use ezk_sip_ua::invite::{create_ack, initiator::Early};
 
 use crate::{
-    protocol::protobuf::sip_gateway::outgoing_call_data::outgoing_call_event::sip_event,
+    protocol::protobuf::sip_gateway::outgoing_call_data::{
+        outgoing_call_event::{self, sip_event},
+        OutgoingCallEvent,
+    },
     sip::server::outgoing::{build_sip_event, talking_state::TalkingState, State},
     utils::select2,
 };
 
-use super::{Ctx, SipOutgoingCallError, StateLogic, StateOut};
+use super::{canceling_state::CancelingState, Ctx, SipOutgoingCallError, StateLogic, StateOut};
 
+#[derive(Debug)]
 pub struct EarlyState {
     early: Early,
+    cancelled: bool,
 }
 
 impl EarlyState {
     pub fn new(early: Early) -> Self {
-        Self { early }
+        Self { early, cancelled: false }
     }
 }
 
@@ -28,11 +33,22 @@ impl StateLogic for EarlyState {
         if let Some(auth) = &mut ctx.auth {
             auth.session.authorize_request(&mut cancel.headers);
         }
+        log::info!("[EarlyState] end => send cancel");
         ctx.initiator.send_cancel(cancel).await?;
+        self.cancelled = true;
         Ok(())
     }
 
     async fn recv(&mut self, ctx: &mut Ctx) -> Result<Option<StateOut>, SipOutgoingCallError> {
+        if self.cancelled {
+            return Ok(Some(StateOut::Switch(
+                State::Canceling(CancelingState),
+                OutgoingCallEvent {
+                    event: Some(outgoing_call_event::Event::Cancelled(Default::default())),
+                },
+            )));
+        }
+
         match select2::or(ctx.initiator.receive(), self.early.receive()).await {
             select2::OrOutput::Left(event) => match event? {
                 ezk_sip_ua::invite::initiator::Response::Provisional(_tsx_response) => {

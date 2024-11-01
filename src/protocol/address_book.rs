@@ -1,5 +1,6 @@
 use derive_more::derive::{Deref, Display, From, Into};
 use ipnet::IpNet;
+use poem_openapi::Enum;
 use serde::{Deserialize, Serialize};
 
 use super::SipAuth;
@@ -20,6 +21,13 @@ pub struct PhoneNumber {
     pub auth: Option<SipAuth>,
     pub app_id: String,
     pub hook: String,
+    pub hook_content_type: HookContentType,
+}
+
+#[derive(Debug, Enum, Clone, Copy, Deserialize)]
+pub enum HookContentType {
+    Json,
+    Protobuf,
 }
 
 #[derive(Debug, Deserialize)]

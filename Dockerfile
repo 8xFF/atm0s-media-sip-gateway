@@ -11,7 +11,7 @@ RUN case $TARGETPLATFORM in \
         "linux/arm64")  BUILD=aarch64-unknown-linux-gnu  ;; \
         *) exit 1 ;; \
     esac; \
-    mv /tmp/atm0s-media-sip-gateway-$BUILD /atm0s-media-sip-gateway; \
+    mv /tmp/atm0s-media-sip-gateway-$BUILD/atm0s-media-sip-gateway /atm0s-media-sip-gateway; \
     chmod +x /atm0s-media-sip-gateway
 
 FROM ubuntu:22.04
