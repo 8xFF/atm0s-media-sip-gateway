@@ -1,4 +1,8 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 
 use atm0s_small_p2p::pubsub_service::PubsubServiceRequester;
 use incoming_call::IncomingCall;
@@ -39,12 +43,13 @@ impl CallManager {
     pub async fn new(
         call_pubsub: PubsubServiceRequester,
         sip_addr: SocketAddr,
+        public_ip: IpAddr,
         address_book: AddressBookStorage,
         secure_ctx: Arc<SecureContext>,
         http_hook: HttpHook<CallEvent>,
         media_gateway: &str,
     ) -> Self {
-        let sip = SipServer::new(sip_addr).await.expect("should create sip-server");
+        let sip = SipServer::new(sip_addr, public_ip).await.expect("should create sip-server");
         let (destroy_tx, destroy_rx) = unbounded_channel();
         Self {
             call_pubsub,

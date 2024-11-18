@@ -1,4 +1,7 @@
-use std::{io, net::SocketAddr};
+use std::{
+    io,
+    net::{IpAddr, SocketAddr},
+};
 
 use ezk_sip_core::{transport::udp::Udp, Endpoint, LayerKey};
 use ezk_sip_types::{
@@ -39,13 +42,13 @@ pub struct SipServer {
 }
 
 impl SipServer {
-    pub async fn new(addr: SocketAddr) -> io::Result<Self> {
+    pub async fn new(addr: SocketAddr, public_ip: IpAddr) -> io::Result<Self> {
         let mut builder = Endpoint::builder();
 
         let dialog_layer = builder.add_layer(DialogLayer::default());
         let invite_layer = builder.add_layer(InviteLayer::default());
 
-        let contact: SipUri = format!("sip:atm0s@{}", addr).parse().expect("Should parse");
+        let contact: SipUri = format!("sip:atm0s@{}:{}", public_ip, addr.port()).parse().expect("Should parse");
         let contact = Contact::new(NameAddr::uri(contact));
 
         let (incoming_tx, incoming_rx) = channel(10);

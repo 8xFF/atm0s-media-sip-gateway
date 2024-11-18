@@ -1,6 +1,10 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::Duration,
+};
 
-use atm0s_media_sip_gateway::{AddressBookStorage, AddressBookSync, Gateway, GatewayConfig, GatewayError, SecureContext};
+use atm0s_media_sip_gateway::{fetch_public_ip_from_cloud, AddressBookStorage, AddressBookSync, CloudProvider, Gateway, GatewayConfig, GatewayError, SecureContext};
 use clap::Parser;
 
 /// Sip Gateway for atm0s-media-server
@@ -19,11 +23,9 @@ struct Args {
     #[arg(env, long, value_delimiter = ',')]
     sdn_seeds: Vec<String>,
 
-    /// Allow it broadcast address to other peers
-    /// This allows other peer can active connect to this node
-    /// This option is useful with high performance relay node
+    /// Seed from other node-api
     #[arg(env, long)]
-    sdn_advertise_address: Option<SocketAddr>,
+    sdn_seeds_from_node_api: Option<String>,
 
     /// Sdn secure code
     #[arg(env, long, default_value = "insecure")]
@@ -40,6 +42,15 @@ struct Args {
     /// Address for sip server
     #[arg(long, env, default_value = "0.0.0.0:5060")]
     sip_addr: SocketAddr,
+
+    /// Allow it broadcast address to other peers or sip-servers
+    /// This allows other peer can active connect to this node
+    #[arg(long, env, default_value = "127.0.0.1")]
+    public_ip: IpAddr,
+
+    /// Gather public ip from cloud provider
+    #[arg(long, env)]
+    public_ip_cloud: Option<CloudProvider>,
 
     /// Secret of this gateway
     #[arg(long, env, default_value = "insecure")]
@@ -90,8 +101,24 @@ async fn main() -> Result<(), GatewayError> {
         }
     }
 
+    let mut other_node_addr = vec![];
+    if let Some(seeds_from_node_api) = args.sdn_seeds_from_node_api {
+        log::info!("Fetching seeds from node api {seeds_from_node_api}");
+        let addr = reqwest::get(format!("{seeds_from_node_api}/api/node/address")).await?.text().await?;
+        other_node_addr.push(addr);
+        log::info!("Fetched seeds: {other_node_addr:?}");
+    }
+
+    let mut public_ip_cloud = None;
+    if let Some(cloud) = args.public_ip_cloud {
+        log::info!("Fetching public ip from cloud provider {cloud:?}");
+        public_ip_cloud = Some(fetch_public_ip_from_cloud(cloud).await.expect("should fetch public ip from cloud"));
+        log::info!("Fetched public ip: {public_ip_cloud:?}");
+    }
+
     let cfg = GatewayConfig {
         http_addr: args.http_addr,
+        public_ip: public_ip_cloud.unwrap_or(args.public_ip),
         sip_addr: args.sip_addr,
         address_book,
         http_hook_queues: args.http_hook_queues,
@@ -99,8 +126,11 @@ async fn main() -> Result<(), GatewayError> {
         secure_ctx,
         sdn_peer_id: args.sdn_peer_id.unwrap_or_else(rand::random).into(),
         sdn_listen_addr: args.sdn_listener,
-        sdn_advertise: args.sdn_advertise_address.map(|a| a.into()),
-        sdn_seeds: args.sdn_seeds.iter().map(|s| s.parse().expect("should convert to address")).collect::<Vec<_>>(),
+        sdn_seeds: other_node_addr
+            .iter()
+            .chain(args.sdn_seeds.iter())
+            .map(|s| s.parse().expect("should convert to address"))
+            .collect::<Vec<_>>(),
         sdn_secret: args.sdn_secure_code,
     };
     let mut gateway = Gateway::new(cfg).await?;
