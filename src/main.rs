@@ -1,5 +1,5 @@
 use std::{
-    net::{IpAddr, SocketAddr},
+    net::{IpAddr, SocketAddr, UdpSocket},
     sync::Arc,
     time::Duration,
 };
@@ -25,7 +25,7 @@ struct Args {
 
     /// Seed from other node-api
     #[arg(env, long)]
-    sdn_seeds_from_node_api: Option<String>,
+    sdn_seeds_from_url: Option<String>,
 
     /// Sdn secure code
     #[arg(env, long, default_value = "insecure")]
@@ -85,7 +85,13 @@ struct Args {
 async fn main() -> Result<(), GatewayError> {
     rustls::crypto::ring::default_provider().install_default().expect("should install ring as default");
     tracing_subscriber::fmt::init();
-    let args = Args::parse();
+    let mut args = Args::parse();
+
+    if args.sdn_listener.port() == 0 {
+        let udp = UdpSocket::bind(args.sdn_listener)?;
+        args.sdn_listener.set_port(udp.local_addr()?.port());
+    }
+
     log::info!("Starting server with addr {}, public endpoint {} and sip port {}", args.http_addr, args.http_public, args.sip_addr);
 
     let address_book = AddressBookStorage::new(&args.secret);
@@ -102,9 +108,9 @@ async fn main() -> Result<(), GatewayError> {
     }
 
     let mut other_node_addr = vec![];
-    if let Some(seeds_from_node_api) = args.sdn_seeds_from_node_api {
-        log::info!("Fetching seeds from node api {seeds_from_node_api}");
-        let addr = reqwest::get(format!("{seeds_from_node_api}/api/node/address")).await?.text().await?;
+    if let Some(sdn_seeds_from_url) = args.sdn_seeds_from_url {
+        log::info!("Fetching seeds from node api {sdn_seeds_from_url}");
+        let addr = reqwest::get(&sdn_seeds_from_url).await?.text().await?;
         other_node_addr.push(addr);
         log::info!("Fetched seeds: {other_node_addr:?}");
     }
