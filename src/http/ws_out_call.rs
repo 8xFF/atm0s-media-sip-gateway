@@ -9,7 +9,7 @@ use crate::{
         InternalCallId,
     },
     secure::SecureContext,
-    utils::select3::{self, OrOutput},
+    utils::select2::{self, OrOutput},
 };
 
 use atm0s_small_p2p::pubsub_service::{PubsubServiceRequester, SubscriberEventOb};
@@ -56,10 +56,11 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
     ws.on_upgrade(move |socket| async move {
         let (mut sink, mut stream) = socket.split();
         let (out_tx, mut out_rx) = unbounded_channel();
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
         loop {
-            let out = select3::or(subscriber.recv_ob::<OutgoingCallEvent>(), out_rx.recv(), stream.next()).await;
+            let out = select2::or(select2::or(subscriber.recv_ob::<OutgoingCallEvent>(), out_rx.recv()), select2::or(stream.next(), interval.tick())).await;
             match out {
-                OrOutput::Left(Ok(event)) => match event {
+                OrOutput::Left(OrOutput::Left(Ok(event))) => match event {
                     SubscriberEventOb::PeerJoined(peer_src) => {
                         log::info!("[WsCall {call_id}] publisher {peer_src:?} joined");
                     }
@@ -76,10 +77,10 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                         log::warn!("[WsCall {call_id}] unhandled pubsub event {event:?}");
                     }
                 },
-                OrOutput::Left(_) => {
+                OrOutput::Left(OrOutput::Left(_)) => {
                     break;
                 }
-                OrOutput::Middle(event) => match event {
+                OrOutput::Left(OrOutput::Right(event)) => match event {
                     Some(msg) => {
                         let data = msg.encode_to_vec();
                         log::info!("[WsCall {call_id}] emit data {msg:?}");
@@ -90,7 +91,7 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                     }
                     None => break,
                 },
-                OrOutput::Right(Some(Ok(message))) => {
+                OrOutput::Right(OrOutput::Left(Some(Ok(message)))) => {
                     if let WebsocketMessage::Binary(msg) = message {
                         match OutgoingCallData::decode(msg.as_slice()) {
                             Ok(data) => match data.data {
@@ -134,9 +135,16 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                     }
                     log::info!("[WsCall {call_id}] received data");
                 }
-                OrOutput::Right(_) => {
+                OrOutput::Right(OrOutput::Left(_)) => {
                     log::info!("[WsCall {call_id}] socket closed");
                     break;
+                }
+                OrOutput::Right(OrOutput::Right(_)) => {
+                    log::info!("[WsCall {call_id}] interval tick");
+                    if let Err(e) = sink.send(WebsocketMessage::Ping(vec![])).await {
+                        log::error!("[WsCall {call_id}] send data error {e:?}");
+                        break;
+                    }
                 }
             }
         }
