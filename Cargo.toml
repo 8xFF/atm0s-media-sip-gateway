@@ -2,6 +2,10 @@
 name = "atm0s-media-sip-gateway"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+description = "SIP gateway for atm0s-media-server"
+repository = "https://github.com/8xFF/atm0s-media-sip-gateway"
+homepage = "https://github.com/8xFF/atm0s-media-sip-gateway"
 
 [dependencies]
 async-trait = "0.1.83"
