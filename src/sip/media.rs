@@ -16,7 +16,7 @@ pub enum MediaEngineError {
     Reqwest(#[from] reqwest::Error),
     #[error("Missing location header")]
     MissingLocation,
-    #[error("Invalid localtion value")]
+    #[error("Invalid location value")]
     InvalidLocation,
     #[error("Invalid status code ({0})")]
     InvalidStatus(u16),
