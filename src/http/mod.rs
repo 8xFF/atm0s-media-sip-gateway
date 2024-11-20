@@ -25,7 +25,7 @@ pub enum HttpCommand {
 }
 
 pub struct HttpServer {
-    http_addr: SocketAddr,
+    http_listen: SocketAddr,
     p2p_addr: PeerAddress,
     media_gateway: String,
     secure_ctx: Arc<SecureContext>,
@@ -34,11 +34,11 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(http_addr: SocketAddr, p2p_addr: PeerAddress, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
+    pub fn new(http_listen: SocketAddr, p2p_addr: PeerAddress, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
         let (tx, rx) = channel(10);
         (
             Self {
-                http_addr,
+                http_listen,
                 p2p_addr,
                 media_gateway: media_gateway.to_owned(),
                 tx,
@@ -88,6 +88,6 @@ impl HttpServer {
             )
             .with(Tracing::default());
 
-        Server::new(TcpListener::bind(self.http_addr)).run(app).await
+        Server::new(TcpListener::bind(self.http_listen)).run(app).await
     }
 }

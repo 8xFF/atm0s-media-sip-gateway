@@ -46,9 +46,9 @@ pub enum GatewayError {
 }
 
 pub struct GatewayConfig {
-    pub http_addr: SocketAddr,
+    pub http_listen: SocketAddr,
     pub public_ip: IpAddr,
-    pub sip_addr: SocketAddr,
+    pub sip_listen: SocketAddr,
     pub address_book: AddressBookStorage,
     pub http_hook_queues: usize,
     pub media_gateway: String,
@@ -88,13 +88,13 @@ impl Gateway {
         let p2p_pubsub_call = pubsub_call.requester();
         let http_hook = HttpHook::new(cfg.http_hook_queues);
 
-        let (mut http, http_rx) = HttpServer::new(cfg.http_addr, node_addr.clone(), &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone());
+        let (mut http, http_rx) = HttpServer::new(cfg.http_listen, node_addr.clone(), &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone());
         tokio::spawn(async move { http.run_loop().await });
         tokio::spawn(async move { while let Ok(_) = pubsub_call.run_loop().await {} });
 
         Ok(Self {
             http_rx,
-            call_manager: CallManager::new(p2p_pubsub_call, cfg.sip_addr, cfg.public_ip, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
+            call_manager: CallManager::new(p2p_pubsub_call, cfg.sip_listen, cfg.public_ip, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
             p2p,
         })
     }

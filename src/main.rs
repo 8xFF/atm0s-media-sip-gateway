@@ -33,7 +33,7 @@ struct Args {
 
     /// Listen Address for http server
     #[arg(long, env, default_value = "0.0.0.0:8008")]
-    http_addr: SocketAddr,
+    http_listen: SocketAddr,
 
     /// Public URL for http server
     #[arg(long, env, default_value = "http://127.0.0.1:8008")]
@@ -41,7 +41,7 @@ struct Args {
 
     /// Address for sip server
     #[arg(long, env, default_value = "0.0.0.0:5060")]
-    sip_addr: SocketAddr,
+    sip_listen: SocketAddr,
 
     /// Allow it broadcast address to other peers or sip-servers
     /// This allows other peer can active connect to this node
@@ -87,26 +87,6 @@ async fn main() -> Result<(), GatewayError> {
     tracing_subscriber::fmt::init();
     let mut args = Args::parse();
 
-    if args.sdn_listener.port() == 0 {
-        let udp = UdpSocket::bind(args.sdn_listener)?;
-        args.sdn_listener.set_port(udp.local_addr()?.port());
-    }
-
-    log::info!("Starting server with addr {}, public endpoint {} and sip port {}", args.http_addr, args.http_public, args.sip_addr);
-
-    let address_book = AddressBookStorage::new(&args.secret);
-    let secure_ctx = Arc::new(SecureContext::new(&args.secret, address_book.clone()));
-
-    if let Some(phone_url) = args.phone_numbers_sync {
-        if let Some(app_url) = args.apps_sync {
-            let mut address_book_sync = AddressBookSync::new(&phone_url, &app_url, Duration::from_millis(args.sync_interval_ms), address_book.clone());
-
-            tokio::spawn(async move {
-                address_book_sync.run_loop().await;
-            });
-        }
-    }
-
     let mut other_node_addr = vec![];
     if let Some(sdn_seeds_from_url) = args.sdn_seeds_from_url {
         log::info!("Fetching seeds from node api {sdn_seeds_from_url}");
@@ -122,21 +102,49 @@ async fn main() -> Result<(), GatewayError> {
         log::info!("Fetched public ip: {public_ip_cloud:?}");
     }
 
+    if args.sdn_listener.port() == 0 {
+        let udp = UdpSocket::bind(args.sdn_listener)?;
+        args.sdn_listener.set_port(udp.local_addr()?.port());
+    }
+
+    let sdn_seeds = other_node_addr
+        .iter()
+        .chain(args.sdn_seeds.iter())
+        .map(|s| s.parse().expect("should convert to address"))
+        .collect::<Vec<_>>();
+    let public_ip = public_ip_cloud.unwrap_or(args.public_ip);
+
+    log::info!(
+        "Starting server with addr {}, public endpoint {} and sip port {}, public_ip {public_ip:?}, sdn_seeds {sdn_seeds:?}",
+        args.http_listen,
+        args.http_public,
+        args.sip_listen
+    );
+
+    let address_book = AddressBookStorage::new(&args.secret);
+    let secure_ctx = Arc::new(SecureContext::new(&args.secret, address_book.clone()));
+
+    if let Some(phone_url) = args.phone_numbers_sync {
+        if let Some(app_url) = args.apps_sync {
+            let mut address_book_sync = AddressBookSync::new(&phone_url, &app_url, Duration::from_millis(args.sync_interval_ms), address_book.clone());
+
+            tokio::spawn(async move {
+                address_book_sync.run_loop().await;
+            });
+        }
+    }
+
     let cfg = GatewayConfig {
-        http_addr: args.http_addr,
-        public_ip: public_ip_cloud.unwrap_or(args.public_ip),
-        sip_addr: args.sip_addr,
+        http_listen: args.http_listen,
+        public_ip,
+        sip_listen: args.sip_listen,
         address_book,
         http_hook_queues: args.http_hook_queues,
         media_gateway: args.media_gateway,
         secure_ctx,
         sdn_peer_id: args.sdn_peer_id.unwrap_or_else(rand::random).into(),
         sdn_listen_addr: args.sdn_listener,
-        sdn_seeds: other_node_addr
-            .iter()
-            .chain(args.sdn_seeds.iter())
-            .map(|s| s.parse().expect("should convert to address"))
-            .collect::<Vec<_>>(),
+        sdn_seeds,
         sdn_secret: args.sdn_secure_code,
     };
     let mut gateway = Gateway::new(cfg).await?;
