@@ -60,7 +60,7 @@ async fn run_call_loop(
                 SipOutgoingCallOut::Event(event) => {
                     log::info!("[OutgoingCall] send event {event:?}");
                     publisher.requester().publish_ob(&event).await.print_error("[OutgoingCall] send event");
-                    hook.send(hook_content_type, build_call_event(event));
+                    hook.send(hook_content_type, build_call_event(&call_id, event));
                 }
                 SipOutgoingCallOut::Continue => {}
             },
@@ -74,7 +74,7 @@ async fn run_call_loop(
                     event: Some(outgoing_call_event::Event::Err(outgoing_call_event::Error { message: e.to_string() })),
                 };
                 publisher.requester().publish_ob(&event).await.print_error("[OutgoingCall] send event");
-                hook.send(hook_content_type, build_call_event(event));
+                hook.send(hook_content_type, build_call_event(&call_id, event));
                 break;
             }
             select2::OrOutput::Right(Ok(control)) => match control {
@@ -114,12 +114,13 @@ async fn run_call_loop(
         event: Some(outgoing_call_event::Event::Ended(Default::default())),
     };
     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
-    hook.send(hook_content_type, build_call_event(event));
+    hook.send(hook_content_type, build_call_event(&call_id, event));
     destroy_tx.send(call_id).expect("should send destroy request to main loop");
 }
 
-fn build_call_event(event: OutgoingCallEvent) -> CallEvent {
+fn build_call_event(call_id: &InternalCallId, event: OutgoingCallEvent) -> CallEvent {
     CallEvent {
+        call_id: call_id.clone().into(),
         timestamp: now_ms(),
         event: Some(call_event::Event::Outgoing(event)),
     }

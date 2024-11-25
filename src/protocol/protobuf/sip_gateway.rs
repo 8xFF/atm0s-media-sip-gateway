@@ -10,7 +10,7 @@ pub mod incoming_call_data {
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Clone, PartialEq, ::prost::Message)]
     pub struct IncomingCallEvent {
-        #[prost(oneof = "incoming_call_event::Event", tags = "1, 2, 3, 4")]
+        #[prost(oneof = "incoming_call_event::Event", tags = "10, 11, 12, 13, 14")]
         pub event: ::core::option::Option<incoming_call_event::Event>,
     }
     /// Nested message and enum types in `IncomingCallEvent`.
@@ -43,6 +43,9 @@ pub mod incoming_call_data {
         pub struct Accepted {}
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Rejected {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct Ended {}
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Message)]
@@ -53,14 +56,16 @@ pub mod incoming_call_data {
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum Event {
-            #[prost(message, tag = "1")]
+            #[prost(message, tag = "10")]
             Err(Error),
-            #[prost(message, tag = "2")]
+            #[prost(message, tag = "11")]
             Sip(SipEvent),
-            #[prost(message, tag = "3")]
+            #[prost(message, tag = "12")]
             Accepted(Accepted),
-            #[prost(message, tag = "4")]
+            #[prost(message, tag = "13")]
             Ended(Ended),
+            #[prost(message, tag = "14")]
+            Rejected(Rejected),
         }
     }
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -68,7 +73,7 @@ pub mod incoming_call_data {
     pub struct IncomingCallRequest {
         #[prost(uint32, tag = "1")]
         pub req_id: u32,
-        #[prost(oneof = "incoming_call_request::Action", tags = "10, 11, 12, 13")]
+        #[prost(oneof = "incoming_call_request::Action", tags = "10, 11, 12")]
         pub action: ::core::option::Option<incoming_call_request::Action>,
     }
     /// Nested message and enum types in `IncomingCallRequest`.
@@ -88,9 +93,6 @@ pub mod incoming_call_data {
         }
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-        pub struct Accept2 {}
-        #[derive(serde::Serialize, serde::Deserialize)]
-        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct End {}
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
@@ -100,9 +102,50 @@ pub mod incoming_call_data {
             #[prost(message, tag = "11")]
             Accept(Accept),
             #[prost(message, tag = "12")]
-            Accept2(Accept2),
-            #[prost(message, tag = "13")]
             End(End),
+        }
+    }
+    #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct IncomingCallNotifyResponse {
+        #[prost(
+            oneof = "incoming_call_notify_response::Action",
+            tags = "10, 11, 12, 13"
+        )]
+        pub action: ::core::option::Option<incoming_call_notify_response::Action>,
+    }
+    /// Nested message and enum types in `IncomingCallNotifyResponse`.
+    pub mod incoming_call_notify_response {
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Ring {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, PartialEq, ::prost::Message)]
+        pub struct Accept {
+            #[prost(string, tag = "1")]
+            pub room: ::prost::alloc::string::String,
+            #[prost(string, tag = "2")]
+            pub peer: ::prost::alloc::string::String,
+            #[prost(bool, tag = "3")]
+            pub record: bool,
+        }
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct End {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Continue {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, PartialEq, ::prost::Oneof)]
+        pub enum Action {
+            #[prost(message, tag = "10")]
+            Ring(Ring),
+            #[prost(message, tag = "11")]
+            Accept(Accept),
+            #[prost(message, tag = "12")]
+            End(End),
+            #[prost(message, tag = "13")]
+            Continue(Continue),
         }
     }
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -122,18 +165,11 @@ pub mod incoming_call_data {
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct Accept {}
         #[derive(serde::Serialize, serde::Deserialize)]
-        #[derive(Clone, PartialEq, ::prost::Message)]
-        pub struct Accept2 {
-            #[prost(string, tag = "1")]
-            pub room: ::prost::alloc::string::String,
-            #[prost(string, tag = "2")]
-            pub peer: ::prost::alloc::string::String,
-            #[prost(string, tag = "3")]
-            pub token: ::prost::alloc::string::String,
-        }
-        #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct End {}
+        #[derive(serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
+        pub struct Continue {}
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct Error {
@@ -150,9 +186,9 @@ pub mod incoming_call_data {
             #[prost(message, tag = "12")]
             Accept(Accept),
             #[prost(message, tag = "13")]
-            Accept2(Accept2),
-            #[prost(message, tag = "14")]
             End(End),
+            #[prost(message, tag = "14")]
+            Continue(Continue),
         }
     }
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -326,9 +362,7 @@ pub mod outgoing_call_data {
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IncomingCallNotify {
-    #[prost(string, tag = "1")]
-    pub call_id: ::prost::alloc::string::String,
-    #[prost(oneof = "incoming_call_notify::Event", tags = "10, 11, 12")]
+    #[prost(oneof = "incoming_call_notify::Event", tags = "10, 11, 12, 13")]
     pub event: ::core::option::Option<incoming_call_notify::Event>,
 }
 /// Nested message and enum types in `IncomingCallNotify`.
@@ -362,6 +396,14 @@ pub mod incoming_call_notify {
         pub call_to: ::prost::alloc::string::String,
     }
     #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct CallRejected {
+        #[prost(string, tag = "3")]
+        pub call_from: ::prost::alloc::string::String,
+        #[prost(string, tag = "4")]
+        pub call_to: ::prost::alloc::string::String,
+    }
+    #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         #[prost(message, tag = "10")]
@@ -370,14 +412,18 @@ pub mod incoming_call_notify {
         Cancelled(CallCancelled),
         #[prost(message, tag = "12")]
         Accepted(CallAccepted),
+        #[prost(message, tag = "13")]
+        Rejected(CallRejected),
     }
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CallEvent {
-    #[prost(uint64, tag = "10")]
+    #[prost(uint64, tag = "1")]
     pub timestamp: u64,
-    #[prost(oneof = "call_event::Event", tags = "1, 2, 3")]
+    #[prost(string, tag = "2")]
+    pub call_id: ::prost::alloc::string::String,
+    #[prost(oneof = "call_event::Event", tags = "10, 11, 12")]
     pub event: ::core::option::Option<call_event::Event>,
 }
 /// Nested message and enum types in `CallEvent`.
@@ -385,11 +431,11 @@ pub mod call_event {
     #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
-        #[prost(message, tag = "1")]
+        #[prost(message, tag = "10")]
         Notify(super::IncomingCallNotify),
-        #[prost(message, tag = "2")]
+        #[prost(message, tag = "11")]
         Outgoing(super::outgoing_call_data::OutgoingCallEvent),
-        #[prost(message, tag = "3")]
+        #[prost(message, tag = "12")]
         Incoming(super::incoming_call_data::IncomingCallEvent),
     }
 }

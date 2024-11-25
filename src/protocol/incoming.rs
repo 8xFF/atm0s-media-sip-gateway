@@ -24,7 +24,7 @@ impl TryFrom<IncomingCallActionRequest> for incoming_call_request::Action {
 
     fn try_from(mut value: IncomingCallActionRequest) -> Result<Self, Self::Error> {
         let req = match value.action {
-            IncomingCallAction::Ring => incoming_call_request::Action::Ring(incoming_call_request::Ring {}),
+            IncomingCallAction::Ring => incoming_call_request::Action::Ring(Default::default()),
             IncomingCallAction::Accept => {
                 let stream = value.stream.take().ok_or("missing stream info")?;
                 incoming_call_request::Action::Accept(incoming_call_request::Accept {
@@ -62,5 +62,14 @@ pub fn is_sip_incoming_cancelled(event: &Option<incoming_call_event::Event>) -> 
         },
         incoming_call_event::Event::Accepted(..) => None,
         incoming_call_event::Event::Ended(..) => None,
+        incoming_call_event::Event::Rejected(..) => None,
+    }
+}
+
+pub fn is_sip_incoming_rejected(event: &Option<incoming_call_event::Event>) -> Option<()> {
+    if let incoming_call_event::Event::Rejected(..) = event.as_ref()? {
+        Some(())
+    } else {
+        None
     }
 }

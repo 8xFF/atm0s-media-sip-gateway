@@ -72,7 +72,7 @@ impl StateLogic for WaitState {
 
         let (session, _) = self.acceptor.take().expect("should have acceptor").respond_success(response).await?;
         let event = IncomingCallEvent {
-            event: Some(incoming_call_event::Event::Accepted(incoming_call_event::Accepted {})),
+            event: Some(incoming_call_event::Event::Accepted(Default::default())),
         };
         self.tx
             .send(Some(StateOut::Switch(State::Talking(TalkingState::new(session, rtp)), event)))
@@ -85,6 +85,11 @@ impl StateLogic for WaitState {
         let acceptor = self.acceptor.take().expect("should have acceptor when start called");
         let response = acceptor.create_response(Code::BUSY_HERE, None).await?;
         acceptor.respond_failure(response).await?;
+        self.tx
+            .send(Some(StateOut::Event(IncomingCallEvent {
+                event: Some(incoming_call_event::Event::Rejected(Default::default())),
+            })))
+            .expect("should send to parent");
         self.tx.send(None).expect("should send to parent");
         Ok(())
     }
@@ -99,15 +104,15 @@ impl StateLogic for WaitState {
     async fn recv(&mut self, _ctx: &mut Ctx) -> Result<Option<StateOut>, SipIncomingCallError> {
         let out = select2::or(self.rx.recv(), self.cancelled.notified()).await;
         match out {
-            select2::OrOutput::Left(event) => Ok(event.expect("")),
+            select2::OrOutput::Left(event) => return Ok(event.expect("should have event")),
             select2::OrOutput::Right(_) => {
                 self.tx.send(None).expect("should send to parent");
                 let event = IncomingCallEvent {
                     event: Some(incoming_call_event::Event::Sip(incoming_call_event::SipEvent {
-                        event: Some(sip_event::Event::Cancelled(sip_event::Cancelled {})),
+                        event: Some(sip_event::Event::Cancelled(Default::default())),
                     })),
                 };
-                Ok(Some(StateOut::Event(event)))
+                return Ok(Some(StateOut::Event(event)));
             }
         }
     }
