@@ -99,7 +99,7 @@ impl StateLogic for WaitState {
     async fn recv(&mut self, _ctx: &mut Ctx) -> Result<Option<StateOut>, SipIncomingCallError> {
         let out = select2::or(self.rx.recv(), self.cancelled.notified()).await;
         match out {
-            select2::OrOutput::Left(event) => return Ok(event.expect("")),
+            select2::OrOutput::Left(event) => Ok(event.expect("")),
             select2::OrOutput::Right(_) => {
                 self.tx.send(None).expect("should send to parent");
                 let event = IncomingCallEvent {
@@ -107,7 +107,7 @@ impl StateLogic for WaitState {
                         event: Some(sip_event::Event::Cancelled(sip_event::Cancelled {})),
                     })),
                 };
-                return Ok(Some(StateOut::Event(event)));
+                Ok(Some(StateOut::Event(event)))
             }
         }
     }
