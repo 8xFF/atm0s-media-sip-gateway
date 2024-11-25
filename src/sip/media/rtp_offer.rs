@@ -41,7 +41,7 @@ impl MediaRtpEngineOffer {
             .timeout(Duration::from_secs(3))
             .build()
             .expect("Should create client")
-            .post(&format!("{}/rtpengine/offer", self.api.gateway()))
+            .post(format!("{}/rtpengine/offer", self.api.gateway()))
             .header("Authorization", format!("Bearer {}", token))
             .send()
             .await?;

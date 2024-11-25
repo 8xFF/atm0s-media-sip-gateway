@@ -16,12 +16,9 @@ impl StateLogic for CancelingState {
 
     async fn recv(&mut self, ctx: &mut Ctx) -> Result<Option<StateOut>, SipOutgoingCallError> {
         loop {
-            match ctx.initiator.receive().await? {
-                Response::Finished => {
-                    log::info!("[CancelingState] on Finished");
-                    break Ok(None);
-                }
-                _ => {}
+            if let Response::Finished = ctx.initiator.receive().await? {
+                log::info!("[CancelingState] on Finished");
+                break Ok(None);
             }
         }
     }

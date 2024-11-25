@@ -27,7 +27,7 @@ impl MediaRtpEngineAnswer {
             .timeout(Duration::from_secs(3))
             .build()
             .expect("Should create client")
-            .post(&format!("{}/rtpengine/answer", self.api.gateway()))
+            .post(format!("{}/rtpengine/answer", self.api.gateway()))
             .header("Content-Type", "application/sdp")
             .header("Authorization", format!("Bearer {}", token))
             .body(self.offer.clone())

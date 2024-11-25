@@ -32,7 +32,7 @@ pub struct CallApis {
 impl CallApis {
     #[oai(path = "/outgoing", method = "post")]
     async fn create_call(&self, secret: TokenAuthorization, data: Json<CreateCallRequest>) -> ApiRes<CreateCallResponse, CallApiError> {
-        let _app_id: crate::protocol::AppId = self.secure_ctx.check_secret(&secret.0.token).ok_or::<CallApiError>(CallApiError::WrongSecret.into())?;
+        let _app_id: crate::protocol::AppId = self.secure_ctx.check_secret(&secret.0.token).ok_or::<CallApiError>(CallApiError::WrongSecret)?;
         log::info!("create_call: from {:?} to {:?} streaming: {:?}", data.from_number, data.to_number, data.streaming);
         let media_api = MediaApi::new(&self.media_gateway, &secret.0.token);
 
@@ -58,13 +58,13 @@ impl CallApis {
         };
 
         let channel = token.call_id.to_pubsub_channel();
-        let req: outgoing_call_request::Action = data.0.try_into().map_err(|e| CallApiError::BadRequest(e))?;
+        let req: outgoing_call_request::Action = data.0.try_into().map_err(CallApiError::BadRequest)?;
         let res = self
             .call_pubsub
             .feedback_rpc_as_guest_ob::<_, outgoing_call_response::Response>(channel, "action", &req, Duration::from_secs(RPC_TIMEOUT_SECONDS))
             .await
             .map_err(|e| CallApiError::InternalChannel(e.to_string()))?;
-        let res: OutgoingCallActionResponse = res.try_into().map_err(|e| CallApiError::SipError(e))?;
+        let res: OutgoingCallActionResponse = res.try_into().map_err(CallApiError::SipError)?;
         Ok(res.into())
     }
 
@@ -80,13 +80,13 @@ impl CallApis {
         };
 
         let channel = token.call_id.to_pubsub_channel();
-        let req: incoming_call_request::Action = data.0.try_into().map_err(|e| CallApiError::BadRequest(e))?;
+        let req: incoming_call_request::Action = data.0.try_into().map_err(CallApiError::BadRequest)?;
         let res = self
             .call_pubsub
             .feedback_rpc_as_guest_ob::<_, incoming_call_response::Response>(channel, "action", &req, Duration::from_secs(RPC_TIMEOUT_SECONDS))
             .await
             .map_err(|e| CallApiError::InternalChannel(e.to_string()))?;
-        let res: IncomingCallActionResponse = res.try_into().map_err(|e| CallApiError::SipError(e))?;
+        let res: IncomingCallActionResponse = res.try_into().map_err(CallApiError::SipError)?;
         Ok(res.into())
     }
 
@@ -108,7 +108,7 @@ impl CallApis {
             .feedback_rpc_as_guest_ob::<_, outgoing_call_response::Response>(channel, "destroy", &req, Duration::from_secs(RPC_TIMEOUT_SECONDS))
             .await
             .map_err(|e| CallApiError::InternalChannel(e.to_string()))?;
-        let _: OutgoingCallActionResponse = res.try_into().map_err(|e| CallApiError::SipError(e))?;
+        let _: OutgoingCallActionResponse = res.try_into().map_err(CallApiError::SipError)?;
         Ok("OK".to_owned().into())
     }
 
@@ -130,7 +130,7 @@ impl CallApis {
             .feedback_rpc_as_guest_ob::<_, incoming_call_response::Response>(channel, "destroy", &req, Duration::from_secs(RPC_TIMEOUT_SECONDS))
             .await
             .map_err(|e| CallApiError::InternalChannel(e.to_string()))?;
-        let _: IncomingCallActionResponse = res.try_into().map_err(|e| CallApiError::SipError(e))?;
+        let _: IncomingCallActionResponse = res.try_into().map_err(CallApiError::SipError)?;
         Ok("OK".to_owned().into())
     }
 }

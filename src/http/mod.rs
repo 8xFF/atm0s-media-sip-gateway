@@ -86,7 +86,7 @@ impl HttpServer {
                     call_pubsub: self.call_pubsub.clone(),
                 }),
             )
-            .with(Tracing::default());
+            .with(Tracing);
 
         Server::new(TcpListener::bind(self.http_listen)).run(app).await
     }
