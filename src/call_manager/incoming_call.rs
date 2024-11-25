@@ -11,11 +11,11 @@ use crate::{
     error::PrintErrorSimple,
     hook::HttpHookSender,
     protocol::{
-        is_sip_incoming_cancelled,
+        is_sip_incoming_cancelled, is_sip_incoming_rejected,
         protobuf::sip_gateway::{
             call_event,
-            incoming_call_data::{incoming_call_event, incoming_call_request, incoming_call_response, IncomingCallEvent, IncomingCallRequest},
-            incoming_call_notify::{self, CallArrived, CallCancelled},
+            incoming_call_data::{incoming_call_event, incoming_call_notify_response, incoming_call_request, incoming_call_response, IncomingCallEvent, IncomingCallNotifyResponse},
+            incoming_call_notify::{self, CallAccepted, CallArrived, CallCancelled, CallRejected},
             CallEvent, IncomingCallNotify,
         },
         HookContentType, InternalCallId, StreamingInfo,
@@ -70,7 +70,7 @@ async fn run_call_loop(
 
     // feedback hook for info
     let action = match hook
-        .request::<IncomingCallRequest>(
+        .request::<IncomingCallNotifyResponse>(
             hook_content_type,
             &build_call_notify(
                 &call_id,
@@ -100,8 +100,8 @@ async fn run_call_loop(
     log::info!("[IncomingCall] call {call_id} got hook action {:?}", action);
 
     match action {
-        incoming_call_request::Action::Ring(_ring) => call.send_ringing().await?,
-        incoming_call_request::Action::Accept(accept) => {
+        incoming_call_notify_response::Action::Ring(_ring) => call.send_ringing().await?,
+        incoming_call_notify_response::Action::Accept(accept) => {
             call.accept(
                 api.clone(),
                 StreamingInfo {
@@ -112,15 +112,11 @@ async fn run_call_loop(
             )
             .await?;
         }
-        incoming_call_request::Action::Accept2(_) => {
-            log::warn!("[IncomingCall] hook dont support accept2 response");
-            call.kill_because_validate_failed();
-            return Err(anyhow!("invalid response"));
-        }
-        incoming_call_request::Action::End(_end) => {
+        incoming_call_notify_response::Action::End(_end) => {
             call.end().await.print_error("[IncomingCall] end call from hook response");
             return Ok(());
         }
+        incoming_call_notify_response::Action::Continue(_) => {}
     };
 
     log::info!("[IncomingCall] call {call_id} started loop");
@@ -133,8 +129,11 @@ async fn run_call_loop(
                     if is_sip_incoming_cancelled(&event.event).is_some() {
                         hook.send(hook_content_type, build_call_notify_cancel(&call_id, &from, &to));
                     }
+                    if is_sip_incoming_rejected(&event.event).is_some() {
+                        hook.send(hook_content_type, build_call_notify_reject(&call_id, &from, &to));
+                    }
                     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
-                    hook.send(hook_content_type, build_call_event(event));
+                    hook.send(hook_content_type, build_call_event(&call_id, event));
                 }
                 SipIncomingCallOut::Continue => {}
             },
@@ -148,7 +147,7 @@ async fn run_call_loop(
                     event: Some(incoming_call_event::Event::Err(incoming_call_event::Error { message: e.to_string() })),
                 };
                 publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
-                hook.send(hook_content_type, build_call_event(event));
+                hook.send(hook_content_type, build_call_event(&call_id, event));
                 break;
             }
             select2::OrOutput::Right(Ok(control)) => match control {
@@ -189,15 +188,6 @@ async fn run_call_loop(
                                 incoming_call_response::Response::Accept(Default::default())
                             }
                         }
-                        incoming_call_request::Action::Accept2(_accept2) => {
-                            let room: String = call.call_id().into();
-                            let peer: String = "callee".to_owned();
-                            //TODO how to config that?
-                            match api.create_webrtc_token(&room, &peer, false).await {
-                                Ok(token) => incoming_call_response::Response::Accept2(incoming_call_response::Accept2 { room, peer, token }),
-                                Err(e) => incoming_call_response::Response::Error(incoming_call_response::Error { message: e.to_string() }),
-                            }
-                        }
                         incoming_call_request::Action::End(_end) => {
                             log::info!("[IncomingCall] call {call_id} received end request");
                             if let Err(e) = call.end().await {
@@ -225,7 +215,7 @@ async fn run_call_loop(
         event: Some(incoming_call_event::Event::Ended(Default::default())),
     };
     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
-    hook.send(hook_content_type, build_call_event(event));
+    hook.send(hook_content_type, build_call_event(&call_id, event));
     Ok(())
 }
 
@@ -239,10 +229,20 @@ fn build_call_notify_cancel(call_id: &InternalCallId, from: &str, to: &str) -> C
     )
 }
 
+fn build_call_notify_reject(call_id: &InternalCallId, from: &str, to: &str) -> CallEvent {
+    build_call_notify(
+        call_id,
+        incoming_call_notify::Event::Rejected(CallRejected {
+            call_from: from.to_owned(),
+            call_to: to.to_owned(),
+        }),
+    )
+}
+
 fn build_call_notify_accept(call_id: &InternalCallId, from: &str, to: &str) -> CallEvent {
     build_call_notify(
         call_id,
-        incoming_call_notify::Event::Cancelled(CallCancelled {
+        incoming_call_notify::Event::Accepted(CallAccepted {
             call_from: from.to_owned(),
             call_to: to.to_owned(),
         }),
@@ -251,16 +251,15 @@ fn build_call_notify_accept(call_id: &InternalCallId, from: &str, to: &str) -> C
 
 fn build_call_notify(call_id: &InternalCallId, event: incoming_call_notify::Event) -> CallEvent {
     CallEvent {
+        call_id: call_id.clone().into(),
         timestamp: now_ms(),
-        event: Some(call_event::Event::Notify(IncomingCallNotify {
-            call_id: call_id.clone().into(),
-            event: Some(event),
-        })),
+        event: Some(call_event::Event::Notify(IncomingCallNotify { event: Some(event) })),
     }
 }
 
-fn build_call_event(event: IncomingCallEvent) -> CallEvent {
+fn build_call_event(call_id: &InternalCallId, event: IncomingCallEvent) -> CallEvent {
     CallEvent {
+        call_id: call_id.clone().into(),
         timestamp: now_ms(),
         event: Some(call_event::Event::Incoming(event)),
     }
