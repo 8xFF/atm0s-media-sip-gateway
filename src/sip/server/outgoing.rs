@@ -117,6 +117,7 @@ pub struct SipOutgoingCall {
 }
 
 impl SipOutgoingCall {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         media_api: MediaApi,
         endpoint: Endpoint,

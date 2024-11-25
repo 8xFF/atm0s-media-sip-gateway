@@ -90,7 +90,7 @@ impl Gateway {
 
         let (mut http, http_rx) = HttpServer::new(cfg.http_listen, node_addr.clone(), &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone());
         tokio::spawn(async move { http.run_loop().await });
-        tokio::spawn(async move { while let Ok(_) = pubsub_call.run_loop().await {} });
+        tokio::spawn(async move { while pubsub_call.run_loop().await.is_ok() {} });
 
         Ok(Self {
             http_rx,
