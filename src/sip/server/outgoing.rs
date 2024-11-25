@@ -117,6 +117,7 @@ pub struct SipOutgoingCall {
 }
 
 impl SipOutgoingCall {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         media_api: MediaApi,
         endpoint: Endpoint,
@@ -131,9 +132,10 @@ impl SipOutgoingCall {
         let call_id: InternalCallId = InternalCallId::random();
         log::info!("[SipOutgoingCall {call_id}] create with {from} => {to}");
         let local_uri = endpoint.parse_uri(from).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
-        let target = endpoint.parse_uri(to).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
+        let target_url = endpoint.parse_uri(to).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
+        log::info!("[SipOutgoingCall] local {local_uri:?} => target {target_url:?}");
 
-        let initiator = Initiator::new(endpoint, dialog_layer, invite_layer, NameAddr::uri(local_uri.clone()), contact, target);
+        let initiator = Initiator::new(endpoint, dialog_layer, invite_layer, NameAddr::uri(local_uri.clone()), contact, target_url);
 
         let auth = auth.map(|auth| {
             let mut credentials = CredentialStore::new();

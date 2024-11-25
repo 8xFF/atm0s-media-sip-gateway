@@ -48,7 +48,7 @@ impl MediaApi {
             .timeout(Duration::from_secs(3))
             .build()
             .expect("Should create client")
-            .post(&format!("{}/token/rtpengine", self.gateway))
+            .post(format!("{}/token/rtpengine", self.gateway))
             .header("Authorization", format!("Bearer {}", self.app_secret))
             .json(&serde_json::json!({
                 "room": room,
@@ -75,7 +75,7 @@ impl MediaApi {
             .timeout(Duration::from_secs(3))
             .build()
             .expect("Should create client")
-            .post(&format!("{}/token/webrtc", self.gateway))
+            .post(format!("{}/token/webrtc", self.gateway))
             .header("Authorization", format!("Bearer {}", self.app_secret))
             .json(&serde_json::json!({
                 "room": room,

@@ -5,7 +5,7 @@ use crate::{
     secure::SecureContext,
     sip::MediaApi,
 };
-use atm0s_small_p2p::pubsub_service::PubsubServiceRequester;
+use atm0s_small_p2p::{pubsub_service::PubsubServiceRequester, PeerAddress};
 use poem::{get, listener::TcpListener, middleware::Tracing, EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
 use tokio::sync::{
@@ -14,6 +14,7 @@ use tokio::sync::{
 };
 
 mod api_call;
+mod api_node;
 mod header_secret;
 mod response_result;
 mod ws_in_call;
@@ -24,7 +25,8 @@ pub enum HttpCommand {
 }
 
 pub struct HttpServer {
-    addr: SocketAddr,
+    http_listen: SocketAddr,
+    p2p_addr: PeerAddress,
     media_gateway: String,
     secure_ctx: Arc<SecureContext>,
     tx: Sender<HttpCommand>,
@@ -32,11 +34,12 @@ pub struct HttpServer {
 }
 
 impl HttpServer {
-    pub fn new(addr: SocketAddr, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
+    pub fn new(http_listen: SocketAddr, p2p_addr: PeerAddress, media_gateway: &str, secure_ctx: Arc<SecureContext>, call_pubsub: PubsubServiceRequester) -> (Self, Receiver<HttpCommand>) {
         let (tx, rx) = channel(10);
         (
             Self {
-                addr,
+                http_listen,
+                p2p_addr,
                 media_gateway: media_gateway.to_owned(),
                 tx,
                 secure_ctx,
@@ -47,6 +50,11 @@ impl HttpServer {
     }
 
     pub async fn run_loop(&mut self) -> io::Result<()> {
+        let node_api = api_node::Apis::new(api_node::NodeApiCtx { address: self.p2p_addr.clone() });
+        let node_service: OpenApiService<_, ()> = OpenApiService::new(node_api, "Node APIs", env!("CARGO_PKG_VERSION")).server("/").url_prefix("/node");
+        let node_ui = node_service.swagger_ui();
+        let node_spec = node_service.spec();
+
         let call_api = api_call::CallApis {
             media_gateway: self.media_gateway.clone(),
             tx: self.tx.clone(),
@@ -58,9 +66,12 @@ impl HttpServer {
         let call_spec = call_service.spec();
 
         let app = Route::new()
+            .nest("/node/", node_service)
             .nest("/call/", call_service)
+            .nest("/docs/node/", node_ui)
             .nest("/docs/call/", call_ui)
             .at("/docs/call/spec", poem::endpoint::make_sync(move |_| call_spec.clone()))
+            .at("/docs/node/spec", poem::endpoint::make_sync(move |_| node_spec.clone()))
             .at(
                 "/call/outgoing/:call_id",
                 get(ws_out_call::ws_single_call).data(ws_out_call::WebsocketCallCtx {
@@ -75,8 +86,8 @@ impl HttpServer {
                     call_pubsub: self.call_pubsub.clone(),
                 }),
             )
-            .with(Tracing::default());
+            .with(Tracing);
 
-        Server::new(TcpListener::bind(self.addr)).run(app).await
+        Server::new(TcpListener::bind(self.http_listen)).run(app).await
     }
 }

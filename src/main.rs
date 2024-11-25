@@ -1,6 +1,10 @@
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    net::{IpAddr, SocketAddr, UdpSocket},
+    sync::Arc,
+    time::Duration,
+};
 
-use atm0s_media_sip_gateway::{AddressBookStorage, AddressBookSync, Gateway, GatewayConfig, GatewayError, SecureContext};
+use atm0s_media_sip_gateway::{fetch_public_ip_from_cloud, AddressBookStorage, AddressBookSync, CloudProvider, Gateway, GatewayConfig, GatewayError, SecureContext};
 use clap::Parser;
 
 /// Sip Gateway for atm0s-media-server
@@ -19,11 +23,9 @@ struct Args {
     #[arg(env, long, value_delimiter = ',')]
     sdn_seeds: Vec<String>,
 
-    /// Allow it broadcast address to other peers
-    /// This allows other peer can active connect to this node
-    /// This option is useful with high performance relay node
+    /// Seed from other node-api
     #[arg(env, long)]
-    sdn_advertise_address: Option<SocketAddr>,
+    sdn_seeds_from_url: Option<String>,
 
     /// Sdn secure code
     #[arg(env, long, default_value = "insecure")]
@@ -31,7 +33,7 @@ struct Args {
 
     /// Listen Address for http server
     #[arg(long, env, default_value = "0.0.0.0:8008")]
-    http_addr: SocketAddr,
+    http_listen: SocketAddr,
 
     /// Public URL for http server
     #[arg(long, env, default_value = "http://127.0.0.1:8008")]
@@ -39,7 +41,16 @@ struct Args {
 
     /// Address for sip server
     #[arg(long, env, default_value = "0.0.0.0:5060")]
-    sip_addr: SocketAddr,
+    sip_listen: SocketAddr,
+
+    /// Allow it broadcast address to other peers or sip-servers
+    /// This allows other peer can active connect to this node
+    #[arg(long, env, default_value = "127.0.0.1")]
+    public_ip: IpAddr,
+
+    /// Gather public ip from cloud provider
+    #[arg(long, env)]
+    public_ip_cloud: Option<CloudProvider>,
 
     /// Secret of this gateway
     #[arg(long, env, default_value = "insecure")]
@@ -74,8 +85,41 @@ struct Args {
 async fn main() -> Result<(), GatewayError> {
     rustls::crypto::ring::default_provider().install_default().expect("should install ring as default");
     tracing_subscriber::fmt::init();
-    let args = Args::parse();
-    log::info!("Starting server with addr {}, public endpoint {} and sip port {}", args.http_addr, args.http_public, args.sip_addr);
+    let mut args = Args::parse();
+
+    let mut other_node_addr = vec![];
+    if let Some(sdn_seeds_from_url) = args.sdn_seeds_from_url {
+        log::info!("Fetching seeds from node api {sdn_seeds_from_url}");
+        let addr = reqwest::get(&sdn_seeds_from_url).await?.text().await?;
+        other_node_addr.push(addr);
+        log::info!("Fetched seeds: {other_node_addr:?}");
+    }
+
+    let mut public_ip_cloud = None;
+    if let Some(cloud) = args.public_ip_cloud {
+        log::info!("Fetching public ip from cloud provider {cloud:?}");
+        public_ip_cloud = Some(fetch_public_ip_from_cloud(cloud).await.expect("should fetch public ip from cloud"));
+        log::info!("Fetched public ip: {public_ip_cloud:?}");
+    }
+
+    if args.sdn_listener.port() == 0 {
+        let udp = UdpSocket::bind(args.sdn_listener)?;
+        args.sdn_listener.set_port(udp.local_addr()?.port());
+    }
+
+    let sdn_seeds = other_node_addr
+        .iter()
+        .chain(args.sdn_seeds.iter())
+        .map(|s| s.parse().expect("should convert to address"))
+        .collect::<Vec<_>>();
+    let public_ip = public_ip_cloud.unwrap_or(args.public_ip);
+
+    log::info!(
+        "Starting server with addr {}, public endpoint {} and sip port {}, public_ip {public_ip:?}, sdn_seeds {sdn_seeds:?}",
+        args.http_listen,
+        args.http_public,
+        args.sip_listen
+    );
 
     let address_book = AddressBookStorage::new(&args.secret);
     let secure_ctx = Arc::new(SecureContext::new(&args.secret, address_book.clone()));
@@ -91,16 +135,16 @@ async fn main() -> Result<(), GatewayError> {
     }
 
     let cfg = GatewayConfig {
-        http_addr: args.http_addr,
-        sip_addr: args.sip_addr,
+        http_listen: args.http_listen,
+        public_ip,
+        sip_listen: args.sip_listen,
         address_book,
         http_hook_queues: args.http_hook_queues,
         media_gateway: args.media_gateway,
         secure_ctx,
         sdn_peer_id: args.sdn_peer_id.unwrap_or_else(rand::random).into(),
         sdn_listen_addr: args.sdn_listener,
-        sdn_advertise: args.sdn_advertise_address.map(|a| a.into()),
-        sdn_seeds: args.sdn_seeds.iter().map(|s| s.parse().expect("should convert to address")).collect::<Vec<_>>(),
+        sdn_seeds,
         sdn_secret: args.sdn_secure_code,
     };
     let mut gateway = Gateway::new(cfg).await?;

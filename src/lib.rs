@@ -1,7 +1,13 @@
-use std::{io, net::SocketAddr, sync::Arc};
+use std::{
+    io,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+};
 
 use atm0s_small_p2p::{pubsub_service::PubsubService, NetworkAddress, P2pNetwork, P2pNetworkConfig, P2pNetworkEvent, PeerAddress, PeerId, SharedKeyHandshake};
 use call_manager::CallManager;
+use clap::ValueEnum;
 use hook::HttpHook;
 use http::{HttpCommand, HttpServer};
 use rustls::pki_types::{CertificateDer, PrivatePkcs8KeyDer};
@@ -35,18 +41,20 @@ pub enum GatewayError {
     Queue,
     #[error("Anyhow({0})")]
     Anyhow(#[from] anyhow::Error),
+    #[error("ReqwestError {0}")]
+    Reqwest(#[from] reqwest::Error),
 }
 
 pub struct GatewayConfig {
-    pub http_addr: SocketAddr,
-    pub sip_addr: SocketAddr,
+    pub http_listen: SocketAddr,
+    pub public_ip: IpAddr,
+    pub sip_listen: SocketAddr,
     pub address_book: AddressBookStorage,
     pub http_hook_queues: usize,
     pub media_gateway: String,
     pub secure_ctx: Arc<SecureContext>,
     pub sdn_peer_id: PeerId,
     pub sdn_listen_addr: SocketAddr,
-    pub sdn_advertise: Option<NetworkAddress>,
     pub sdn_seeds: Vec<PeerAddress>,
     pub sdn_secret: String,
 }
@@ -62,10 +70,12 @@ impl Gateway {
         let priv_key = PrivatePkcs8KeyDer::from(DEFAULT_CLUSTER_KEY.to_vec());
         let cert = CertificateDer::from(DEFAULT_CLUSTER_CERT.to_vec());
 
+        let advertise_addr = NetworkAddress::from(SocketAddr::new(cfg.public_ip, cfg.sdn_listen_addr.port()));
+        let node_addr = PeerAddress::new(cfg.sdn_peer_id, advertise_addr.clone());
         let mut p2p = P2pNetwork::new(P2pNetworkConfig {
             peer_id: cfg.sdn_peer_id,
             listen_addr: cfg.sdn_listen_addr,
-            advertise: cfg.sdn_advertise,
+            advertise: Some(advertise_addr),
             priv_key,
             cert,
             tick_ms: 1000,
@@ -78,13 +88,13 @@ impl Gateway {
         let p2p_pubsub_call = pubsub_call.requester();
         let http_hook = HttpHook::new(cfg.http_hook_queues);
 
-        let (mut http, http_rx) = HttpServer::new(cfg.http_addr, &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone());
+        let (mut http, http_rx) = HttpServer::new(cfg.http_listen, node_addr.clone(), &cfg.media_gateway, cfg.secure_ctx.clone(), p2p_pubsub_call.clone());
         tokio::spawn(async move { http.run_loop().await });
-        tokio::spawn(async move { while let Ok(_) = pubsub_call.run_loop().await {} });
+        tokio::spawn(async move { while pubsub_call.run_loop().await.is_ok() {} });
 
         Ok(Self {
             http_rx,
-            call_manager: CallManager::new(p2p_pubsub_call, cfg.sip_addr, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
+            call_manager: CallManager::new(p2p_pubsub_call, cfg.sip_listen, cfg.public_ip, cfg.address_book, cfg.secure_ctx, http_hook, &cfg.media_gateway).await,
             p2p,
         })
     }
@@ -113,6 +123,40 @@ impl Gateway {
                 P2pNetworkEvent::Continue => Ok(()),
             },
             select3::OrOutput::Right(_) => Ok(()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum CloudProvider {
+    Aws,
+    Gcp,
+    Azure,
+    Other,
+}
+
+pub async fn fetch_public_ip_from_cloud(cloud: CloudProvider) -> Result<IpAddr, String> {
+    match cloud {
+        CloudProvider::Aws => {
+            let resp = reqwest::get("http://169.254.169.254/latest/meta-data/public-ipv4").await.map_err(|e| e.to_string())?;
+            let ip = resp.text().await.map_err(|e| e.to_string())?;
+            IpAddr::from_str(ip.trim()).map_err(|e| e.to_string())
+        }
+        CloudProvider::Gcp => {
+            let client = reqwest::Client::new();
+            let resp = client
+                .get("http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
+                .header("Metadata-Flavor", "Google")
+                .send()
+                .await
+                .map_err(|e| e.to_string())?;
+            let ip = resp.text().await.map_err(|e| e.to_string())?;
+            IpAddr::from_str(ip.trim()).map_err(|e| e.to_string())
+        }
+        CloudProvider::Azure | CloudProvider::Other => {
+            let resp = reqwest::get("http://ipv4.icanhazip.com").await.map_err(|e| e.to_string())?;
+            let ip = resp.text().await.map_err(|e| e.to_string())?;
+            IpAddr::from_str(ip.trim()).map_err(|e| e.to_string())
         }
     }
 }
