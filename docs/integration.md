@@ -16,7 +16,8 @@ WebSocket interfaces.
    [SipOutgoing UI SDK](https://github.com/8xFF/atm0s-media-sdk-ts/tree/main/apps/web/app/react_ui_samples/sipOutgoing)
    to show Outgoing UI with call_ws uri from step 1 (or manually implement it
    with websocket and media sdk)
-3. Handling call event with hooks (included in phone number info)
+3. Control the call with APIs or direct from UI
+4. Handling call event with hooks (included in phone number info)
 
 Note that the call will be terminated when the websocket is closed.
 
@@ -80,7 +81,8 @@ Note that the call will be terminated when the websocket is closed.
    [SipIncoming UI SDK](https://github.com/8xFF/atm0s-media-sdk-ts/tree/main/apps/web/app/react_ui_samples/sipIncoming)
    to init SipIncomingHandler with call_ws from step 2 (or manually implement
    with Websocket).
-4. Handling call event with hooks (included in phone number info)
+4. Control the call with APIs or direct from UI
+5. Handling call event with hooks (included in phone number info)
 
 Note that the call will be terminated when the websocket is closed.
 
