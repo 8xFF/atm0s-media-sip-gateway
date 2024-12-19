@@ -52,7 +52,7 @@ impl<Event: Serialize + Message> HttpHookQueue<Event> {
                 }
                 Err(e) => {
                     log::error!("[HttpHookQueue] send hook to {} error {e:?} in try {count}/{MAX_RETRY}", req.endpoint);
-                    if e.is_connect() && count < MAX_RETRY {
+                    if count < MAX_RETRY {
                         log::error!("[HttpHookQueue] connect error => retry in try {count}/{MAX_RETRY}");
                         continue;
                     }
