@@ -40,51 +40,51 @@ jobs:
           # - windows msvc x64
         include:
           - build: linux gnu x64
-            os: ubuntu-latest
+            os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             extension: ""
           # - build: linux musl x64
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   target: x86_64-unknown-linux-musl
           #   extension: ""
           - build: linux gnu aarch64
-            os: ubuntu-latest
+            os: ubuntu-22.04
             target: aarch64-unknown-linux-gnu
             extension: ""
           # - build: linux musl aarch64
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   target: aarch64-unknown-linux-musl
           #   extension: ""
           # - build: linux gnueabihf arm
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   target: arm-unknown-linux-gnueabihf
           #   extension: ""
           # - build: linux gnueabihf armv7
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   target: armv7-unknown-linux-gnueabihf
           #   extension: ""
           # - build: linux gnu mips
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   rust: 1.71.1
           #   target: mips-unknown-linux-gnu
           #   extension: ""
           # - build: linux gnuabi64 mips64
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   rust: 1.71.1
           #   target: mips64-unknown-linux-gnuabi64
           #   extension: ""
           # - build: linux gnuabi64 mips64el
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   rust: 1.71.1
           #   target: mips64el-unknown-linux-gnuabi64
           #   extension: ""
           # - build: linux gnu mipsel
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   rust: 1.71.1
           #   target: mipsel-unknown-linux-gnu
           #   extension: ""
           # - build: linux musl aarch64
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   target: aarch64-unknown-linux-musl
           #   extension: ""
           - build: macos x64
@@ -96,7 +96,7 @@ jobs:
             target: aarch64-apple-darwin
             extension: ""
           # - build: windows gnu x64
-          #   os: ubuntu-latest
+          #   os: ubuntu-22.04
           #   target: x86_64-pc-windows-gnu
           #   extension: ".exe"
           # - build: windows msvc x64
@@ -154,7 +154,7 @@ jobs:
 
   deploy-docker:
     needs: build-release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
