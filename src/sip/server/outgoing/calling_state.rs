@@ -29,6 +29,7 @@ impl StateLogic for CallingState {
         invite.body = sdp.clone();
         invite.headers.insert_named(&ContentType(BytesStr::from_static("application/sdp")));
         if let Some(auth) = &mut ctx.auth {
+            log::info!("[CallingState] add authorize to headers");
             auth.session.authorize_request(&mut invite.headers);
         }
 
@@ -70,6 +71,10 @@ impl StateLogic for CallingState {
                 log::info!("[CallingState] on Failure {code}");
                 if code != 401 || self.auth_failed {
                     return Ok(Some(StateOut::Event(build_sip_event(sip_event::Event::Failure(sip_event::Failure { code: code as u32 })))));
+                }
+
+                if code == 401 {
+                    self.auth_failed = true;
                 }
 
                 if let Some(auth) = &mut ctx.auth {
