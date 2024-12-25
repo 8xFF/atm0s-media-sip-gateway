@@ -9,6 +9,8 @@ use tokio::sync::{
 
 use crate::protocol::HookContentType;
 
+const MAX_RETRY: usize = 5;
+
 pub struct HttpHookRequest<Event> {
     pub endpoint: String,
     pub headers: HashMap<String, String>,
@@ -39,18 +41,27 @@ impl<Event: Serialize + Message> HttpHookQueue<Event> {
 
     pub async fn run(&mut self) {
         let mut req = self.rx.recv().await.expect("should receive");
-        log::info!("[HttpHookQueue] sending hook to {}", req.endpoint);
-        let res = self.send(&req).await;
-        match &res {
-            Ok(_res) => {
-                log::info!("[HttpHookQueue] sent hook to {}", req.endpoint);
+        let mut count = 0;
+        while count < MAX_RETRY {
+            count += 1;
+            log::info!("[HttpHookQueue] sending hook to {}, retry {count}/{MAX_RETRY}", req.endpoint);
+            let res = self.send(&req).await;
+            match &res {
+                Ok(_res) => {
+                    log::info!("[HttpHookQueue] sent hook to {} in try {count}/{MAX_RETRY}", req.endpoint);
+                }
+                Err(e) => {
+                    log::error!("[HttpHookQueue] send hook to {} error {e:?} in try {count}/{MAX_RETRY}", req.endpoint);
+                    if count < MAX_RETRY {
+                        log::error!("[HttpHookQueue] connect error => retry in try {count}/{MAX_RETRY}");
+                        continue;
+                    }
+                }
             }
-            Err(e) => {
-                log::error!("[HttpHookQueue] send hook to {} error {e:?}", req.endpoint);
+            if let Some(tx) = req.res_tx.take() {
+                let _ = tx.send(res);
             }
-        }
-        if let Some(tx) = req.res_tx.take() {
-            let _ = tx.send(res);
+            break;
         }
     }
 }
