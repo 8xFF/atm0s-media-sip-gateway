@@ -21,11 +21,16 @@ pub struct CallingState {
 impl StateLogic for CallingState {
     async fn start(&mut self, ctx: &mut Ctx) -> Result<(), SipOutgoingCallError> {
         if ctx.rtp.sdp().is_none() {
+            log::info!("[CallingState] creating rtp-sdp");
             ctx.rtp.create_offer().await?;
         }
 
         let sdp = ctx.rtp.sdp().expect("should have sdp");
         let mut invite = ctx.initiator.create_invite();
+        if let Some(ref proxy_uri) = ctx.proxy_uri {
+            log::info!("[CallingState] replace uri with proxy_uri");
+            invite.line.uri = proxy_uri.clone();
+        }
         invite.body = sdp.clone();
         invite.headers.insert_named(&ContentType(BytesStr::from_static("application/sdp")));
         if let Some(auth) = &mut ctx.auth {
@@ -33,6 +38,7 @@ impl StateLogic for CallingState {
             auth.session.authorize_request(&mut invite.headers);
         }
 
+        log::info!("[CallingState] send invite");
         ctx.initiator.send_invite(invite).await?;
         Ok(())
     }
@@ -69,11 +75,11 @@ impl StateLogic for CallingState {
                 let code = response.line.code.into_u16();
 
                 log::info!("[CallingState] on Failure {code}");
-                if code != 401 || self.auth_failed {
+                if (code != 401 && code != 407) || self.auth_failed {
                     return Ok(Some(StateOut::Event(build_sip_event(sip_event::Event::Failure(sip_event::Failure { code: code as u32 })))));
                 }
 
-                if code == 401 {
+                if code == 401 || code == 407 {
                     self.auth_failed = true;
                 }
 

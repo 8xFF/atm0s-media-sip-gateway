@@ -22,6 +22,7 @@ The SIP Gateway allows developers to manage SIP-based communication, including m
   ```json
   {
     "sip_server": "string",
+    "sip_proxy": "string",
     "sip_auth": {
       "username": "string",
       "password": "string"

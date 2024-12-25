@@ -71,8 +71,19 @@ impl SipServer {
         })
     }
 
-    pub fn make_call(&self, media_api: MediaApi, from: &str, to: &str, auth: Option<SipAuth>, stream: StreamingInfo) -> Result<SipOutgoingCall, SipOutgoingCallError> {
-        SipOutgoingCall::new(media_api, self.endpoint.clone(), self.dialog_layer, self.invite_layer, from, to, self.contact.clone(), auth, stream)
+    pub fn make_call(&self, media_api: MediaApi, from: &str, to: &str, proxy_uri: Option<&str>, auth: Option<SipAuth>, stream: StreamingInfo) -> Result<SipOutgoingCall, SipOutgoingCallError> {
+        SipOutgoingCall::new(
+            media_api,
+            self.endpoint.clone(),
+            self.dialog_layer,
+            self.invite_layer,
+            from,
+            to,
+            proxy_uri,
+            self.contact.clone(),
+            auth,
+            stream,
+        )
     }
 
     pub async fn recv(&mut self) -> Option<SipServerOut> {

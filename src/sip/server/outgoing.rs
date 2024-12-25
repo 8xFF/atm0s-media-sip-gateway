@@ -8,7 +8,10 @@ use ezk_sip_auth::{
     CredentialStore, UacAuthSession,
 };
 use ezk_sip_core::{Endpoint, LayerKey};
-use ezk_sip_types::{header::typed::Contact, uri::NameAddr};
+use ezk_sip_types::{
+    header::typed::Contact,
+    uri::{NameAddr, Uri},
+};
 use ezk_sip_ua::{
     dialog::DialogLayer,
     invite::{initiator::Initiator, InviteLayer},
@@ -106,6 +109,7 @@ pub enum SipOutgoingCallOut {
 
 struct Ctx {
     call_id: InternalCallId,
+    proxy_uri: Option<Box<dyn Uri>>,
     initiator: Initiator,
     auth: Option<OutgoingAuth>,
     rtp: MediaRtpEngineOffer,
@@ -125,12 +129,19 @@ impl SipOutgoingCall {
         invite_layer: LayerKey<InviteLayer>,
         from: &str,
         to: &str,
+        proxy: Option<&str>,
         contact: Contact,
         auth: Option<SipAuth>,
         stream: StreamingInfo,
     ) -> Result<Self, SipOutgoingCallError> {
         let call_id: InternalCallId = InternalCallId::random();
-        log::info!("[SipOutgoingCall {call_id}] create with {from} => {to}");
+        log::info!("[SipOutgoingCall {call_id}] create with {from} => {to}, auth {:?}", auth);
+
+        let proxy_uri = if let Some(p) = proxy {
+            Some(endpoint.parse_uri(p).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?)
+        } else {
+            None
+        };
         let local_uri = endpoint.parse_uri(from).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
         let target_url = endpoint.parse_uri(to).map_err(|e| SipOutgoingCallError::Parse(e.to_string()))?;
         log::info!("[SipOutgoingCall] local {local_uri:?} => target {target_url:?}");
@@ -149,6 +160,7 @@ impl SipOutgoingCall {
         Ok(Self {
             ctx: Ctx {
                 initiator,
+                proxy_uri,
                 auth,
                 call_id,
                 rtp: MediaRtpEngineOffer::new(media_api, stream),
