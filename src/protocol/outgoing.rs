@@ -9,6 +9,7 @@ use super::{
 #[derive(Debug, Object)]
 pub struct CreateCallRequest {
     pub sip_server: String,
+    pub sip_proxy: Option<String>,
     pub sip_auth: Option<SipAuth>,
     pub from_number: String,
     pub to_number: String,

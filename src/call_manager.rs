@@ -69,7 +69,8 @@ impl CallManager {
         let hook_sender = self.http_hook.new_sender(&req.hook, HashMap::new());
         let from = format!("sip:{}@{}", req.from_number, req.sip_server);
         let to = format!("sip:{}@{}", req.to_number, req.sip_server);
-        match self.sip.make_call(media_api, &from, &to, req.sip_auth, req.streaming) {
+        let proxy_url = req.sip_proxy.map(|p| format!("sip:{}@{}", req.to_number, p));
+        match self.sip.make_call(media_api, &from, &to, proxy_url.as_deref(), req.sip_auth, req.streaming) {
             Ok(call) => {
                 let call_id = call.call_id();
                 let call_token = self.secure_ctx.encode_call_token(
