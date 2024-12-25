@@ -28,7 +28,7 @@ impl StateLogic for CallingState {
         let sdp = ctx.rtp.sdp().expect("should have sdp");
         let mut invite = ctx.initiator.create_invite();
         if let Some(ref proxy_uri) = ctx.proxy_uri {
-            log::info!("[CallingState] replace uri with proxy_uri");
+            log::info!("[CallingState] replace uri {:?} with proxy_uri {proxy_uri:?}", invite.line.uri);
             invite.line.uri = proxy_uri.clone();
         }
         invite.body = sdp.clone();
