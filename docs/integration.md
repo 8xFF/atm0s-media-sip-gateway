@@ -2,20 +2,29 @@
 
 ## Overview
 
-The SIP Gateway allows developers to manage SIP-based communication, including making outgoing calls and handling incoming calls. This guide provides detailed instructions on how to integrate with the SIP Gateway using its API and WebSocket interfaces.
+The SIP Gateway allows developers to manage SIP-based communication, including
+making outgoing calls and handling incoming calls. This guide provides detailed
+instructions on how to integrate with the SIP Gateway using its API and
+WebSocket interfaces.
 
 ## Outgoing Calls
 
 ### Steps
 
-1. Phone numbers sync endpoint should contain number with outgoing SIP information or add a phone number in admin panel.
-2. Create call by API (auth by app_secret, provide from number, to number)
-3. Use SDK to show Outgoing UI with call_ws uri from step 1 (or manually implement it with websocket and media sdk)
+1. Create call by API (auth by app_secret, provide from number, to number)
+2. Use
+   [SipOutgoing UI SDK](https://github.com/8xFF/atm0s-media-sdk-ts/tree/main/apps/web/app/react_ui_samples/sipOutgoing)
+   to show Outgoing UI with call_ws uri from step 1 (or manually implement it
+   with websocket and media sdk)
+3. Control the call with APIs or direct from UI
 4. Handling call event with hooks (included in phone number info)
+
+Note that the call will be terminated when the websocket is closed.
 
 ### APIs
 
 #### Create Outgoing Call
+
 - **Endpoint**: POST `/call/outgoing`
 - **Authentication**: Bearer Token
 - **Request Body**:
@@ -52,6 +61,7 @@ The SIP Gateway allows developers to manage SIP-based communication, including m
   ```
 
 #### End Outgoing Call
+
 - **Endpoint**: DELETE `/call/{call_id}`
 - **Authentication**: Bearer Token
 - **Response**:
@@ -65,14 +75,22 @@ The SIP Gateway allows developers to manage SIP-based communication, including m
 
 ### Steps
 
-1. Phone numbers sync endpoint should contain number with incoming SIP information or add a phone number in admin panel.
-2. Create session_id token by API (auth by app_scret, provide session_id)
-3. Use SDK to init SipIncomingHandler with notify_ws uri from step 2 (or manually implement with Websocket)
-4. Show Incoming UI with SDK when received event from SipIncomingHandler (or manually implement it with websocket and media sdk)
+1. Register phone-number with Admin UI.
+2. Handle incoming call event with hooks, use websocket or push notification to
+   notify client about incoming call.
+3. Show incoming call at client side, use can use
+   [SipIncoming UI SDK](https://github.com/8xFF/atm0s-media-sdk-ts/tree/main/apps/web/app/react_ui_samples/sipIncoming)
+   to init SipIncomingHandler with call_ws from step 2 (or manually implement
+   with Websocket).
+4. Control the call with APIs or direct from UI
+5. Handling call event with hooks (included in phone number info)
+
+Note that the call will be terminated when the websocket is closed.
 
 ### APIs
 
 #### Manage Incoming Call
+
 - **Endpoint**: POST `/call/incoming/{call_id}/action`
 - **Authentication**: Bearer Token
 - **Actions**:
@@ -92,6 +110,7 @@ The SIP Gateway allows developers to manage SIP-based communication, including m
   ```
 
 #### Delete Call
+
 - **Endpoint**: DELETE `/call/{call_id}`
 - **Authentication**: Bearer Token
 - **Response**:
