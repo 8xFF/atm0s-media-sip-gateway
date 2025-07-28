@@ -135,7 +135,10 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                     }
                     log::info!("[WsCall {call_id}] received data");
                 }
-                OrOutput::Right(OrOutput::Left(_)) => {
+                OrOutput::Right(OrOutput::Left(Some(Err(e)))) => {
+                    log::error!("[WsCall {call_id}] socket error {e:?}");
+                }
+                OrOutput::Right(OrOutput::Left(None)) => {
                     log::info!("[WsCall {call_id}] socket closed");
                     break;
                 }
