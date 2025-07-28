@@ -27,7 +27,7 @@ targets = [
 
 [advisories]
 vulnerability = "deny"
-unmaintained = "warn"
+unmaintained = "all"
 yanked = "deny"
 ignore = [
     "RUSTSEC-2023-0071", # a new version of rsa has not been released
