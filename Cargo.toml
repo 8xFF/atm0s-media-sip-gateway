@@ -24,8 +24,8 @@ ezk-sip-ua = { git = "https://github.com/giangndm/ezk.git", rev = "e999d73902b44
 ipnet = { version = "2.10.0", features = ["serde"] }
 log = "0.4.22"
 pin-project-lite = "0.2.14"
-poem = { version = "3.1.0", features = ["websocket"] }
-poem-openapi = { version = "5.1.1", features = ["swagger-ui"] }
+poem = { version = "3.1", features = ["websocket"] }
+poem-openapi = { version = "5.1", features = ["swagger-ui"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde = "1.0.210"
@@ -41,9 +41,10 @@ jwt-simple = { version = "0.12", default-features = false, features = [
     "pure-rust",
 ] }
 anyhow = "1.0"
-atm0s-small-p2p = { git = "https://github.com/8xFF/atm0s-small-p2p.git", rev = "2896a1f0d78e597105a2aa0d256a2a31dbf4809f" }
+atm0s-small-p2p = { git = "https://github.com/8xFF/atm0s-small-p2p.git", rev = "2986073be0b6f2fd610b8e42eacc43168768ed19" }
 rustls = "0.23"
 prost = "0.13"
+hickory-resolver = "=0.25.0-alpha.4"
 
 [build-dependencies]
 prost-build = "0.13"
