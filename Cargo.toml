@@ -41,7 +41,7 @@ jwt-simple = { version = "0.12", default-features = false, features = [
     "pure-rust",
 ] }
 anyhow = "1.0"
-atm0s-small-p2p = { git = "https://github.com/8xFF/atm0s-small-p2p.git", branch = "fix-pubsub-service-wrong-event" }
+atm0s-small-p2p = { git = "https://github.com/8xFF/atm0s-small-p2p.git", rev = "2986073be0b6f2fd610b8e42eacc43168768ed19" }
 rustls = "0.23"
 prost = "0.13"
 

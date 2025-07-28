@@ -150,7 +150,7 @@ dependencies = [
 [[package]]
 name = "atm0s-small-p2p"
 version = "0.2.2"
-source = "git+https://github.com/8xFF/atm0s-small-p2p.git?branch=fix-pubsub-service-wrong-event#4d8f365ea1351e941020341d85e6c36aa3a854f8"
+source = "git+https://github.com/8xFF/atm0s-small-p2p.git?rev=2986073be0b6f2fd610b8e42eacc43168768ed19#2986073be0b6f2fd610b8e42eacc43168768ed19"
 dependencies = [
  "anyhow",
  "bincode",
