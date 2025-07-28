@@ -44,6 +44,7 @@ anyhow = "1.0"
 atm0s-small-p2p = { git = "https://github.com/8xFF/atm0s-small-p2p.git", rev = "2986073be0b6f2fd610b8e42eacc43168768ed19" }
 rustls = "0.23"
 prost = "0.13"
+hickory-resolver = "=0.25.0-alpha.4"
 
 [build-dependencies]
 prost-build = "0.13"
