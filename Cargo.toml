@@ -24,8 +24,8 @@ ezk-sip-ua = { git = "https://github.com/giangndm/ezk.git", rev = "fa946fa651759
 ipnet = { version = "2.10.0", features = ["serde"] }
 log = "0.4.22"
 pin-project-lite = "0.2.14"
-poem = { version = "3.1.0", features = ["websocket"] }
-poem-openapi = { version = "5.1.1", features = ["swagger-ui"] }
+poem = { version = "3.1", features = ["websocket"] }
+poem-openapi = { version = "5.1", features = ["swagger-ui"] }
 rand = "0.8.5"
 reqwest = { version = "0.12.7", features = ["json"] }
 serde = "1.0.210"
