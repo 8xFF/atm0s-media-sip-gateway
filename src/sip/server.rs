@@ -42,10 +42,7 @@ pub struct SipServer {
 }
 
 impl SipServer {
-    pub async fn new(mut addr: SocketAddr, public_ip: IpAddr) -> io::Result<Self> {
-        // log::warn!("[SipServer] force set sip bind ip to {public_ip}. TODO: need to allow nat-traversal");
-        // addr.set_ip(public_ip);
-
+    pub async fn new(addr: SocketAddr, public_ip: IpAddr) -> io::Result<Self> {
         let mut builder = Endpoint::builder();
 
         let dialog_layer = builder.add_layer(DialogLayer::default());
@@ -57,7 +54,7 @@ impl SipServer {
         let (incoming_tx, incoming_rx) = channel(10);
         builder.add_layer(InviteAcceptLayer::new(incoming_tx, contact.clone(), dialog_layer, invite_layer));
 
-        Udp::spawn(&mut builder, addr).await?;
+        Udp::spawn(&mut builder, addr, Some(SocketAddr::new(public_ip, addr.port()))).await?;
 
         // Build endpoint to start the SIP Stack
         let endpoint = builder.build();
