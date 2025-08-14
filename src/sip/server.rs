@@ -43,8 +43,8 @@ pub struct SipServer {
 
 impl SipServer {
     pub async fn new(mut addr: SocketAddr, public_ip: IpAddr) -> io::Result<Self> {
-        log::warn!("[SipServer] force set sip bind ip to {public_ip}. TODO: need to allow nat-traversal");
-        addr.set_ip(public_ip);
+        // log::warn!("[SipServer] force set sip bind ip to {public_ip}. TODO: need to allow nat-traversal");
+        // addr.set_ip(public_ip);
 
         let mut builder = Endpoint::builder();
 
