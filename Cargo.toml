@@ -16,11 +16,11 @@ derive_more = { version = "1.0.0", features = [
     "deref",
     "into",
 ] }
-ezk-sdp-types = { git = "https://github.com/giangndm/ezk.git", rev = "e999d73902b44587600c557b60eddd18adf3517a" }
-ezk-sip-auth = { git = "https://github.com/giangndm/ezk.git", rev = "e999d73902b44587600c557b60eddd18adf3517a" }
-ezk-sip-core = { git = "https://github.com/giangndm/ezk.git", rev = "e999d73902b44587600c557b60eddd18adf3517a" }
-ezk-sip-types = { git = "https://github.com/giangndm/ezk.git", rev = "e999d73902b44587600c557b60eddd18adf3517a" }
-ezk-sip-ua = { git = "https://github.com/giangndm/ezk.git", rev = "e999d73902b44587600c557b60eddd18adf3517a" }
+ezk-sdp-types = { git = "https://github.com/giangndm/ezk.git", rev = "27e797f981e06c27bedad43ccf9a3a1511f753e2" }
+ezk-sip-auth = { git = "https://github.com/giangndm/ezk.git", rev = "27e797f981e06c27bedad43ccf9a3a1511f753e2" }
+ezk-sip-core = { git = "https://github.com/giangndm/ezk.git", rev = "27e797f981e06c27bedad43ccf9a3a1511f753e2" }
+ezk-sip-types = { git = "https://github.com/giangndm/ezk.git", rev = "27e797f981e06c27bedad43ccf9a3a1511f753e2" }
+ezk-sip-ua = { git = "https://github.com/giangndm/ezk.git", rev = "27e797f981e06c27bedad43ccf9a3a1511f753e2" }
 ipnet = { version = "2.10.0", features = ["serde"] }
 log = "0.4.22"
 pin-project-lite = "0.2.14"
