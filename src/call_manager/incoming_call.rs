@@ -14,7 +14,11 @@ use crate::{
         is_sip_incoming_cancelled, is_sip_incoming_rejected,
         protobuf::sip_gateway::{
             call_event,
-            incoming_call_data::{incoming_call_event, incoming_call_notify_response, incoming_call_request, incoming_call_response, IncomingCallEvent, IncomingCallNotifyResponse},
+            incoming_call_data::{
+                incoming_call_event, incoming_call_notify_response, incoming_call_request,
+                incoming_call_response::{self, Pong},
+                IncomingCallEvent, IncomingCallNotifyResponse,
+            },
             incoming_call_notify::{self, CallAccepted, CallArrived, CallCancelled, CallRejected},
             CallEvent, IncomingCallNotify,
         },
@@ -197,6 +201,7 @@ async fn run_call_loop(
                                 incoming_call_response::Response::End(Default::default())
                             }
                         }
+                        incoming_call_request::Action::Ping(_ping) => incoming_call_response::Response::Pong(Pong { live: true }),
                     };
                     publisher.requester().answer_feedback_rpc_ob(rpc_id, peer_src, &res).await.print_error("[IncomingCall] answer rpc");
                 }

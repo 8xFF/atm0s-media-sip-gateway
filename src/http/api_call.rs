@@ -68,6 +68,28 @@ impl CallApis {
         Ok(res.into())
     }
 
+    #[oai(path = "/incoming/:call_id/ping", method = "post")]
+    async fn ping_incall(&self, Path(call_id): Path<String>, Query(token): Query<String>) -> ApiRes<IncomingCallActionResponse, CallApiError> {
+        let token = if let Some(token) = self.secure_ctx.decode_call_token(&token) {
+            if *token.call_id != call_id {
+                return Err(CallApiError::WrongToken.into());
+            }
+            token
+        } else {
+            return Err(CallApiError::WrongToken.into());
+        };
+
+        let channel = token.call_id.to_pubsub_channel();
+        let req = incoming_call_request::Action::Ping(Default::default());
+        let res = self
+            .call_pubsub
+            .feedback_rpc_as_guest_ob::<_, incoming_call_response::Response>(channel, "action", &req, Duration::from_secs(RPC_TIMEOUT_SECONDS))
+            .await
+            .map_err(|e| CallApiError::InternalChannel(e.to_string()))?;
+        let res: IncomingCallActionResponse = res.try_into().map_err(CallApiError::SipError)?;
+        Ok(res.into())
+    }
+
     #[oai(path = "/incoming/:call_id/action", method = "post")]
     async fn action_incall(&self, Path(call_id): Path<String>, Query(token): Query<String>, data: Json<IncomingCallActionRequest>) -> ApiRes<IncomingCallActionResponse, CallApiError> {
         let token = if let Some(token) = self.secure_ctx.decode_call_token(&token) {

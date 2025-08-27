@@ -43,12 +43,15 @@ message IncomingCallData {
 
     message End {}
 
+    message Ping {}
+
     uint32 req_id = 1;
 
     oneof action {
       Ring ring = 10;
       Accept accept = 11;
       End end = 12;
+      Ping ping = 13;
     }
   }
 
@@ -82,6 +85,8 @@ message IncomingCallData {
 
     message Continue {}
 
+    message Pong { bool live = 1; }
+
     message Error { string message = 1; }
 
     uint32 req_id = 1;
@@ -92,6 +97,7 @@ message IncomingCallData {
       Accept accept = 12;
       End end = 13;
       Continue continue = 14;
+      Pong pong = 15;
     }
   }
 
