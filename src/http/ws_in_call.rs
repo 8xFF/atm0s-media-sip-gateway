@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use crate::{
     protocol::{
         protobuf::sip_gateway::{
-            incoming_call_data::{self, incoming_call_response, IncomingCallEvent, IncomingCallResponse},
+            incoming_call_data::{self, incoming_call_event, incoming_call_response, IncomingCallEvent, IncomingCallResponse},
             IncomingCallData,
         },
         InternalCallId,
@@ -12,7 +12,7 @@ use crate::{
     utils::select2::{self, OrOutput},
 };
 
-use atm0s_small_p2p::pubsub_service::{PubsubServiceRequester, SubscriberEventOb};
+use atm0s_small_p2p::pubsub_service::{PubsubServiceRequester, SubscriberEventOb, SubscriberRequester};
 use futures_util::{SinkExt, StreamExt};
 use poem::{
     handler,
@@ -40,6 +40,23 @@ struct WsQuery {
     token: String,
 }
 
+async fn is_call_alive(subscriber: &SubscriberRequester) -> bool {
+    let action = incoming_call_data::IncomingCallRequest {
+        req_id: 0,
+        action: Some(incoming_call_data::incoming_call_request::Action::Ping(incoming_call_data::incoming_call_request::Ping {})),
+    };
+    let res = subscriber
+        .feedback_rpc_ob::<_, incoming_call_response::Response>("action", &action, Duration::from_secs(RPC_TIMEOUT_SECONDS))
+        .await;
+    match res {
+        Ok(res) => match res {
+            incoming_call_response::Response::Pong(pong) => pong.live,
+            _ => false,
+        },
+        Err(_) => false,
+    }
+}
+
 #[handler]
 pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQuery>, ws: WebSocket, data: Data<&WebsocketCallCtx>) -> impl IntoResponse {
     let token = query.token;
@@ -55,6 +72,22 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
     let mut subscriber = data.call_pubsub.subscriber(call_id.to_pubsub_channel()).await;
     ws.on_upgrade(move |socket| async move {
         let (mut sink, mut stream) = socket.split();
+
+        if !is_call_alive(subscriber.requester()).await {
+            log::warn!("[WsCall {call_id}] call is not alive => fake sip cancel event");
+            let msg = IncomingCallData {
+                data: Some(incoming_call_data::Data::Event(IncomingCallEvent {
+                    event: Some(incoming_call_event::Event::Sip(incoming_call_event::SipEvent {
+                        event: Some(incoming_call_event::sip_event::Event::Cancelled(Default::default())),
+                    })),
+                })),
+            };
+            let data = msg.encode_to_vec();
+            if let Err(e) = sink.send(WebsocketMessage::Binary(data)).await {
+                log::error!("[WsCall {call_id}] send data error {e:?}");
+            }
+        }
+
         let (out_tx, mut out_rx) = unbounded_channel();
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         loop {
