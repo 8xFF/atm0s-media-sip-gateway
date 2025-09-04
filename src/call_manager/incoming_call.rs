@@ -111,6 +111,10 @@ async fn run_call_loop(
                     .await
                     .print_error("[IncomingCall] publish event");
                 hook.send(hook_content_type, build_call_notify_error(&call_id, &from, &to, e.to_string()));
+                let event = IncomingCallEvent {
+                    event: Some(incoming_call_event::Event::Err(incoming_call_event::Error { message: e.to_string() })),
+                };
+                hook.send(hook_content_type, build_call_event(&call_id, event));
                 return Err(anyhow!("send ringing error"));
             }
         }
@@ -130,6 +134,10 @@ async fn run_call_loop(
                     .await
                     .print_error("[IncomingCall] publish event");
                 hook.send(hook_content_type, build_call_notify_error(&call_id, &from, &to, e.to_string()));
+                let event = IncomingCallEvent {
+                    event: Some(incoming_call_event::Event::Err(incoming_call_event::Error { message: e.to_string() })),
+                };
+                hook.send(hook_content_type, build_call_event(&call_id, event));
                 return Err(anyhow!("accept error"));
             }
         }
