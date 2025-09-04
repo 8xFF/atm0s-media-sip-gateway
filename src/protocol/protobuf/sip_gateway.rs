@@ -73,7 +73,7 @@ pub mod incoming_call_data {
     pub struct IncomingCallRequest {
         #[prost(uint32, tag = "1")]
         pub req_id: u32,
-        #[prost(oneof = "incoming_call_request::Action", tags = "10, 11, 12, 13")]
+        #[prost(oneof = "incoming_call_request::Action", tags = "10, 11, 12")]
         pub action: ::core::option::Option<incoming_call_request::Action>,
     }
     /// Nested message and enum types in `IncomingCallRequest`.
@@ -95,9 +95,6 @@ pub mod incoming_call_data {
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct End {}
         #[derive(serde::Serialize, serde::Deserialize)]
-        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-        pub struct Ping {}
-        #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Oneof)]
         pub enum Action {
             #[prost(message, tag = "10")]
@@ -106,8 +103,6 @@ pub mod incoming_call_data {
             Accept(Accept),
             #[prost(message, tag = "12")]
             End(End),
-            #[prost(message, tag = "13")]
-            Ping(Ping),
         }
     }
     #[derive(serde::Serialize, serde::Deserialize)]
@@ -158,10 +153,7 @@ pub mod incoming_call_data {
     pub struct IncomingCallResponse {
         #[prost(uint32, tag = "1")]
         pub req_id: u32,
-        #[prost(
-            oneof = "incoming_call_response::Response",
-            tags = "10, 11, 12, 13, 14, 15"
-        )]
+        #[prost(oneof = "incoming_call_response::Response", tags = "10, 11, 12, 13, 14")]
         pub response: ::core::option::Option<incoming_call_response::Response>,
     }
     /// Nested message and enum types in `IncomingCallResponse`.
@@ -178,12 +170,6 @@ pub mod incoming_call_data {
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, Copy, PartialEq, ::prost::Message)]
         pub struct Continue {}
-        #[derive(serde::Serialize, serde::Deserialize)]
-        #[derive(Clone, Copy, PartialEq, ::prost::Message)]
-        pub struct Pong {
-            #[prost(bool, tag = "1")]
-            pub live: bool,
-        }
         #[derive(serde::Serialize, serde::Deserialize)]
         #[derive(Clone, PartialEq, ::prost::Message)]
         pub struct Error {
@@ -203,8 +189,6 @@ pub mod incoming_call_data {
             End(End),
             #[prost(message, tag = "14")]
             Continue(Continue),
-            #[prost(message, tag = "15")]
-            Pong(Pong),
         }
     }
     #[derive(serde::Serialize, serde::Deserialize)]
