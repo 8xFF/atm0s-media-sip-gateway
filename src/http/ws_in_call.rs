@@ -1,9 +1,12 @@
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use crate::{
     protocol::{
         protobuf::sip_gateway::{
-            incoming_call_data::{self, incoming_call_response, IncomingCallEvent, IncomingCallResponse},
+            incoming_call_data::{self, incoming_call_event, incoming_call_response, IncomingCallEvent, IncomingCallResponse},
             IncomingCallData,
         },
         InternalCallId,
@@ -28,6 +31,7 @@ use serde::Deserialize;
 use tokio::sync::mpsc::unbounded_channel;
 
 const RPC_TIMEOUT_SECONDS: u64 = 2;
+const WAIT_PUBLISHER_JOINED_MILLIS: u128 = 2000;
 
 #[derive(Clone)]
 pub struct WebsocketCallCtx {
@@ -55,6 +59,8 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
     let mut subscriber = data.call_pubsub.subscriber(call_id.to_pubsub_channel()).await;
     ws.on_upgrade(move |socket| async move {
         let (mut sink, mut stream) = socket.split();
+        let started_at = Instant::now();
+        let mut publisher_joined = false;
         let (out_tx, mut out_rx) = unbounded_channel();
         let mut interval = tokio::time::interval(Duration::from_secs(5));
         loop {
@@ -63,6 +69,7 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                 OrOutput::Left(OrOutput::Left(Ok(event))) => match event {
                     SubscriberEventOb::PeerJoined(peer_src) => {
                         log::info!("[WsCall {call_id}] publisher {peer_src:?} joined");
+                        publisher_joined = true;
                     }
                     SubscriberEventOb::PeerLeaved(peer_src) => {
                         log::info!("[WsCall {call_id}] publisher {peer_src:?} leaved");
@@ -145,6 +152,22 @@ pub async fn ws_single_call(Path(call_id): Path<String>, Query(query): Query<WsQ
                 }
                 OrOutput::Right(OrOutput::Right(_)) => {
                     log::info!("[WsCall {call_id}] interval tick");
+                    if !publisher_joined && started_at.elapsed().as_millis() > WAIT_PUBLISHER_JOINED_MILLIS {
+                        log::warn!("[WsCall {call_id}] publisher not joined after {WAIT_PUBLISHER_JOINED_MILLIS} milliseconds => fake sip Cancelled event");
+                        let msg = IncomingCallData {
+                            data: Some(incoming_call_data::Data::Event(IncomingCallEvent {
+                                event: Some(incoming_call_event::Event::Sip(incoming_call_event::SipEvent {
+                                    event: Some(incoming_call_event::sip_event::Event::Cancelled(Default::default())),
+                                })),
+                            })),
+                        };
+                        let data = msg.encode_to_vec();
+                        if let Err(e) = sink.send(WebsocketMessage::Binary(data)).await {
+                            log::error!("[WsCall {call_id}] send data error {e:?}");
+                        }
+                        break;
+                    }
+
                     if let Err(e) = sink.send(WebsocketMessage::Ping(vec![])).await {
                         log::error!("[WsCall {call_id}] send data error {e:?}");
                         break;
