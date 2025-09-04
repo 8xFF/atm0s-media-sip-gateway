@@ -15,7 +15,7 @@ use crate::{
         protobuf::sip_gateway::{
             call_event,
             incoming_call_data::{incoming_call_event, incoming_call_notify_response, incoming_call_request, incoming_call_response, IncomingCallEvent, IncomingCallNotifyResponse},
-            incoming_call_notify::{self, CallAccepted, CallArrived, CallCancelled, CallRejected},
+            incoming_call_notify::{self, CallAccepted, CallArrived, CallCancelled, CallError, CallRejected},
             CallEvent, IncomingCallNotify,
         },
         HookContentType, InternalCallId, StreamingInfo,
@@ -100,17 +100,38 @@ async fn run_call_loop(
     log::info!("[IncomingCall] call {call_id} got hook action {:?}", action);
 
     match action {
-        incoming_call_notify_response::Action::Ring(_ring) => call.send_ringing().await?,
+        incoming_call_notify_response::Action::Ring(_ring) => {
+            if let Err(e) = call.send_ringing().await {
+                log::error!("[IncomingCall] call {call_id} send ringing error {e:?}");
+                publisher
+                    .requester()
+                    .publish_ob(&IncomingCallEvent {
+                        event: Some(incoming_call_event::Event::Err(incoming_call_event::Error { message: e.to_string() })),
+                    })
+                    .await
+                    .print_error("[IncomingCall] publish event");
+                hook.send(hook_content_type, build_call_notify_error(&call_id, &from, &to, e.to_string()));
+                return Err(anyhow!("send ringing error"));
+            }
+        }
         incoming_call_notify_response::Action::Accept(accept) => {
-            call.accept(
-                api.clone(),
-                StreamingInfo {
-                    room: accept.room,
-                    peer: accept.peer,
-                    record: accept.record,
-                },
-            )
-            .await?;
+            let stream_info = StreamingInfo {
+                room: accept.room,
+                peer: accept.peer,
+                record: accept.record,
+            };
+            if let Err(e) = call.accept(api.clone(), stream_info).await {
+                log::error!("[IncomingCall] call {call_id} accept error {e:?}");
+                publisher
+                    .requester()
+                    .publish_ob(&IncomingCallEvent {
+                        event: Some(incoming_call_event::Event::Err(incoming_call_event::Error { message: e.to_string() })),
+                    })
+                    .await
+                    .print_error("[IncomingCall] publish event");
+                hook.send(hook_content_type, build_call_notify_error(&call_id, &from, &to, e.to_string()));
+                return Err(anyhow!("accept error"));
+            }
         }
         incoming_call_notify_response::Action::End(_end) => {
             call.end().await.print_error("[IncomingCall] end call from hook response");
@@ -217,6 +238,17 @@ async fn run_call_loop(
     publisher.requester().publish_ob(&event).await.print_error("[IncomingCall] publish event");
     hook.send(hook_content_type, build_call_event(&call_id, event));
     Ok(())
+}
+
+fn build_call_notify_error(call_id: &InternalCallId, from: &str, to: &str, message: String) -> CallEvent {
+    build_call_notify(
+        call_id,
+        incoming_call_notify::Event::Error(CallError {
+            call_from: from.to_owned(),
+            call_to: to.to_owned(),
+            message,
+        }),
+    )
 }
 
 fn build_call_notify_cancel(call_id: &InternalCallId, from: &str, to: &str) -> CallEvent {

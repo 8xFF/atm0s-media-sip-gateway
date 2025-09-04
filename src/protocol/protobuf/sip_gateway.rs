@@ -362,7 +362,7 @@ pub mod outgoing_call_data {
 #[derive(serde::Serialize, serde::Deserialize)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct IncomingCallNotify {
-    #[prost(oneof = "incoming_call_notify::Event", tags = "10, 11, 12, 13")]
+    #[prost(oneof = "incoming_call_notify::Event", tags = "10, 11, 12, 13, 14")]
     pub event: ::core::option::Option<incoming_call_notify::Event>,
 }
 /// Nested message and enum types in `IncomingCallNotify`.
@@ -404,6 +404,16 @@ pub mod incoming_call_notify {
         pub call_to: ::prost::alloc::string::String,
     }
     #[derive(serde::Serialize, serde::Deserialize)]
+    #[derive(Clone, PartialEq, ::prost::Message)]
+    pub struct CallError {
+        #[prost(string, tag = "3")]
+        pub call_from: ::prost::alloc::string::String,
+        #[prost(string, tag = "4")]
+        pub call_to: ::prost::alloc::string::String,
+        #[prost(string, tag = "5")]
+        pub message: ::prost::alloc::string::String,
+    }
+    #[derive(serde::Serialize, serde::Deserialize)]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Event {
         #[prost(message, tag = "10")]
@@ -414,6 +424,8 @@ pub mod incoming_call_notify {
         Accepted(CallAccepted),
         #[prost(message, tag = "13")]
         Rejected(CallRejected),
+        #[prost(message, tag = "14")]
+        Error(CallError),
     }
 }
 #[derive(serde::Serialize, serde::Deserialize)]
